@@ -837,4 +837,3 @@ Vector2D OleadaCadetes::centroGrupoScene() const
 {
     return calcularCentroGrupoScene();
 }
-

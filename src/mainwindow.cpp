@@ -123,5 +123,3 @@ void MainWindow::mostrarMenuPrincipal()
 
 
 }
-
-

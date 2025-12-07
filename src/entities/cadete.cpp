@@ -87,4 +87,3 @@ bool Cadete::esJugador() const
 {
     return jugador;
 }
-

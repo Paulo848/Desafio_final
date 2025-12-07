@@ -856,4 +856,3 @@ OleadaCadetes* Nivel::encontrarAliadoMasCercanoEnRotacion(OleadaCadetes *petidor
 
     return mejor;
 }
-
