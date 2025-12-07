@@ -156,6 +156,7 @@ public:
     }
 
     Vector2D rotCanonicoY(const Vector2D &o) const;
+    Vector2D getNormal() const;
     Vector2D desdeEspacioLocal(const Vector2D &local) const;
 
 private:

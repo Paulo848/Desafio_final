@@ -10,6 +10,10 @@ public:
          const Vector2D &dir);
 
     void aplicarColision(FuerzaArmada *objetivo) override;
+    void aplicarImpacto(FuerzaArmada *obj) override;
+
+    bool esDeJugador() const override;
+
 };
 
 #endif

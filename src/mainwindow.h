@@ -5,6 +5,7 @@
 #include <QStackedWidget>
 #include "NivelIso.h"
 #include "levels/nivel.h"
+#include "nivel_1.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -29,6 +30,7 @@ private:
     QStackedWidget *contenedor;
     Nivel *nivelActual;
     NivelIso *nivelActualIso = nullptr;
+    Nivel_1 *nivelActual_;
 };
 
 #endif // MAINWINDOW_H

@@ -9,12 +9,16 @@ class FuerzaArmada : public QGraphicsItem
 {
 protected:
     Vector2D direccion;    // Unitario
-    qreal radio;           // Para hitbox circular
-    int vida = 10;
-    qreal velocidad;
+
+    qreal    radio;        // Para hitbox circular
+    int      vida = 10;
+    qreal    velocidad;
+    bool     jugador;
 
 public:
-    FuerzaArmada(qreal r = 10.0);
+    bool muerto;
+
+    FuerzaArmada(qreal r = 10.0, bool EsJugador = false, qreal vida = 10);
 
     // ----- MOVIMIENTO -----
     inline void setDireccion(const Vector2D &d) {
@@ -29,16 +33,29 @@ public:
 
     // ----- VIDA -----
     inline void setVida(int v) { vida = v; }
-    inline int getVida() const { return vida; }
+
+    inline int  getVida() const { return vida; }
+
+    // ----- ESTADO GENERAL (NUEVO) -----
+    inline bool estaMuerto() const { return muerto; }
+
+    // Helpers genéricos de daño/muerte (NUEVO)
+    void recibirDanio(int d);
+    void morir();
 
     // ----- GRAFICOS -----
     QRectF boundingRect() const override;
     QPainterPath shape() const override;
 
-    // Cada subclase dibuja su propia representación
+
     virtual void paint(QPainter *painter,
                        const QStyleOptionGraphicsItem *option,
                        QWidget *widget) override;
+
+    //---- Colisiones -----
+    virtual void recibirImpacto(Proyectil* p) = 0;
+    virtual bool esJugador() const = 0;
+
 };
 
 #endif // FUERZAARMADA_H

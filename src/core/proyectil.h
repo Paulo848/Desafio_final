@@ -42,6 +42,14 @@ public:
     virtual void paint(QPainter *painter,
                        const QStyleOptionGraphicsItem *,
                        QWidget *);
+
+    virtual bool esDeJugador() const = 0;
+    virtual void aplicarImpacto(FuerzaArmada* obj) = 0;
+
+    inline int getDaño(){
+        return daño;
+    }
+
 };
 
 #endif
