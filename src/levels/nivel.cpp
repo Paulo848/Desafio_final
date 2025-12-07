@@ -246,7 +246,7 @@ void Nivel::actualizarPosicionFondo()
     fondoScroll->setPos(origenFondo.x(), origenFondo.y());
 }
 
-void Nivel::actualizarIA()
+void Nivel::mousePressEvent(QMouseEvent *event)
 {
     // Actualizar agentes activos
     for (auto *a : agentes)
@@ -474,6 +474,9 @@ bool Nivel::jugadorTocaObstaculo() const
     return false;
 }
 
+
+void Nivel::manejarColisiones() {}
+void Nivel::actualizarIA() {}
 void Nivel::onVolverClicked()
 {
     // Volver al menú

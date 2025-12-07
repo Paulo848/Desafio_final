@@ -5,12 +5,11 @@
 #include <QPainter>
 #include "vector2d.h"
 
-class Proyectil;
-
 class FuerzaArmada : public QGraphicsItem
 {
 protected:
     Vector2D direccion;    // Unitario
+
     qreal    radio;        // Para hitbox circular
     int      vida = 10;
     qreal    velocidad;
@@ -34,6 +33,7 @@ public:
 
     // ----- VIDA -----
     inline void setVida(int v) { vida = v; }
+
     inline int  getVida() const { return vida; }
 
     // ----- ESTADO GENERAL (NUEVO) -----
@@ -47,6 +47,7 @@ public:
     QRectF boundingRect() const override;
     QPainterPath shape() const override;
 
+
     virtual void paint(QPainter *painter,
                        const QStyleOptionGraphicsItem *option,
                        QWidget *widget) override;
@@ -54,6 +55,7 @@ public:
     //---- Colisiones -----
     virtual void recibirImpacto(Proyectil* p) = 0;
     virtual bool esJugador() const = 0;
+
 };
 
 #endif // FUERZAARMADA_H

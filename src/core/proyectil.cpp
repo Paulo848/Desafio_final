@@ -49,7 +49,7 @@ void Proyectil::avanzar()
         muerto = true;
         return;
     }
-
+  
     // Colisiones:
 
     auto cols = collidingItems();
