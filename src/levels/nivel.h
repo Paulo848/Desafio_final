@@ -61,7 +61,6 @@ private slots:
     void actualizarJuego();
     void disparosEnemigos();
     void onVolverClicked();
-    void disparosEnemigos();
 
 private:
     // ============================

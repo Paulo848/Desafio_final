@@ -4,6 +4,7 @@
 #include <QGraphicsItem>
 #include <QPainter>
 #include "vector2d.h"
+#include "proyectil.h"
 
 class FuerzaArmada : public QGraphicsItem
 {

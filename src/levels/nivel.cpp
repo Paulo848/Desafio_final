@@ -246,14 +246,6 @@ void Nivel::actualizarPosicionFondo()
     fondoScroll->setPos(origenFondo.x(), origenFondo.y());
 }
 
-void Nivel::mousePressEvent(QMouseEvent *event)
-{
-    // Actualizar agentes activos
-    for (auto *a : agentes)
-        if (a && a->estaActivo())
-            a->actualizar();
-}
-
 void Nivel::actualizarOleadas()
 {
     // Detectar rondas existentes
@@ -349,11 +341,6 @@ void Nivel::actualizarHUD()
     lblBalas->setText(QString("%1 / %2")
                           .arg("")   // jugador->getBalas()
                           .arg("")); // jugador->getBalasMax()
-}
-
-void Nivel::manejarColisiones()
-{
-    // Aquí va la lógica de colisiones
 }
 
 // ============================
