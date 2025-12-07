@@ -687,7 +687,7 @@ void NivelIso::mostrarGameOver()
 
 void NivelIso::dibujarFondoScrolling(QPainter &painter)
 {
-    // Fondo base (mar nocturno)
+    // Fondo base
     painter.fillRect(rect(), Qt::darkBlue);
 
     // Grid que simula movimiento
