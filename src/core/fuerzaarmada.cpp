@@ -1,7 +1,7 @@
 #include "fuerzaarmada.h"
 
-FuerzaArmada::FuerzaArmada(qreal r, bool EsJugador)
-    : direccion(0.0, -1.0), radio(r), vida(40), velocidad(3.0), muerto(false), jugador(EsJugador)
+FuerzaArmada::FuerzaArmada(qreal r, bool EsJugador, qreal vida)
+    : direccion(0.0, -1.0), radio(r), vida(vida), velocidad(3.0), muerto(false), jugador(EsJugador)
 {
     setPos(0, 0); // posición base
 }
@@ -25,4 +25,27 @@ void FuerzaArmada::paint(QPainter *painter,
     // Por defecto, dibuja un círculo gris.
     painter->setBrush(Qt::gray);
     painter->drawEllipse(boundingRect());
+}
+
+void FuerzaArmada::recibirDanio(int d)
+{
+    vida -= d;
+    if (vida <= 0) {
+        vida = 0;
+        morir();
+    }
+}
+
+void FuerzaArmada::morir()
+{
+    if (muerto) return;
+
+    muerto = true;
+
+    // Opcional: desactivar visualmente el item.
+    setEnabled(false);
+    setVisible(false);
+
+    // La eliminación real del objeto (delete) la seguirá
+    // manejando el Nivel, como ya lo estás haciendo.
 }

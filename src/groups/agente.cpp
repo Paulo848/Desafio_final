@@ -15,5 +15,5 @@ Agente::Agente(Nivel *nivelPtr)
 
 Agente::~Agente()
 {
-    // No se borran aquí los FuerzaArmada, eso lo maneja Nivel
+    // El Nivel es quien borra las FuerzaArmada del grupo
 }

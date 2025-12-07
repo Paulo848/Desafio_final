@@ -1,275 +1,275 @@
 #include "oleadacadetes.h"
 #include "nivel.h"
 #include "cadete.h"
-#include <algorithm>
+#include "obstaculo.h"
+
 #include <QRandomGenerator>
-#include "vector2d.h"
 #include <QtMath>
+#include <QGraphicsItem>
+#include <QList>
+#include <limits>
+
+// =====================================
+//  Constructor / Destructor (mínimos)
+// =====================================
 
 OleadaCadetes::OleadaCadetes(Nivel *nivelPtr)
     : Agente(nivelPtr)
 {
+    // Estados por defecto
+    accionMoverActiva    = false;
+    accionDispararActiva = false;
+    focoMovimiento       = Vector2D::nulo();
+
+    radioActivacion      = 0.0;
+    estadoRotacion       = EstadoRotacion::EnCampamento;
+    pidiendoRefuerzo     = false;
+    llamadoPorOtraOleada = false;
+    municionGrupoActual  = 0;
 }
 
-OleadaCadetes::~OleadaCadetes()
-{
-}
-
-void OleadaCadetes::inicializarRondas(int total)
-{
-    totalRondas = total;
-    rondaActual = 1;
-}
+//OleadaCadetes::~OleadaCadetes() = default;
 
 void OleadaCadetes::spawnRonda(int cantidad,
                                qreal radioMin, qreal radioMax,
                                qreal angMinRad, qreal angMaxRad)
 {
-    if (cantidad <= 0) return;
-    if (radioMax <= radioMin) return;
+    if (cantidad <= 0)      return;
+    if (radioMax <= radioMin)   return;
     if (angMaxRad <= angMinRad) return;
+    if (!nivel)                 return;
 
-    enemigosRestantes = cantidad;
-    enemigosTotales = cantidad;
+    enemigosTotales    = cantidad;
+    enemigosRestantes  = cantidad;
 
-    // El jugador está en (0,0) en coords de escena
+    // Jugador en (0,0) en coordenadas de escena (según tu diseño)
     Vector2D centro(0.0, 0.0);
 
     auto *fondo  = nivel->getFondoScroll();
     auto *escena = nivel->getEscena();
+    if (!fondo || !escena) return;
 
     const qreal deltaAng = (angMaxRad - angMinRad) / cantidad;
 
     for (int i = 0; i < cantidad; ++i) {
 
-        // 1) Ángulo estratificado
+        // 1) Ángulo estratificado dentro del rango [angMinRad, angMaxRad]
         qreal angBase = angMinRad + i * deltaAng;
         qreal uAng    = QRandomGenerator::global()->generateDouble(); // [0,1)
         qreal angulo  = angBase + uAng * deltaAng;
 
         // 2) Radio sesgado hacia radioMax
         qreal uRad = QRandomGenerator::global()->generateDouble();    // [0,1)
-        qreal r    = radioMin + (radioMax - radioMin) * (qPow(uRad, 1.5));
+        qreal r    = radioMin + (radioMax - radioMin) * qPow(uRad, 1.5);
 
         // 3) Posición en coordenadas de escena
         Vector2D offset   = Vector2D::desdePolar(r, angulo);
         Vector2D posScene = centro + offset;
 
-        // Convertir escena → sistema local del fondo
+        // Convertir a coordenadas locales del fondo
         QPointF posEnFondo = fondo->mapFromScene(posScene.toPointF());
 
-        // 4) Crear cadete
-        Cadete *e = new Cadete(10.0, 0.0, 0.0, /*esjug=*/false);
+        // 4) Crear cadete enemigo
+        Cadete *e = new Cadete(10.0, 0.0, 0.0, /*esJugador=*/false);
         e->setParentItem(fondo);
         e->setPos(posEnFondo);
+
+        // Dirección inicial mirando al jugador
+        Vector2D dirToPlayer = centro - posScene;
+        if (dirToPlayer.magnitud2() > 0.0)
+            e->setDireccion(dirToPlayer.normalizado());
 
         escena->addItem(e);
 
         grupo.push_back(e);
-        nivel->registrarEnemigo(e);  // <- importante: ahora también dispara y lo limpia el Nivel
+        nivel->registrarEnemigo(e);  // el Nivel también los conoce
+    }
+
+    // Según el modo, ajustamos estados iniciales
+    switch (modo) {
+    case ModoGrupo::Campamento:
+        estado        = EstadoGrupo::Preparando;
+        estadoRotacion = EstadoRotacion::EnCampamento; // aunque no se use si no es Rotacion
+        break;
+
+    case ModoGrupo::Rotacion:
+        estado        = EstadoGrupo::Preparando;
+        estadoRotacion = EstadoRotacion::EnCampamento;
+        break;
+
+    case ModoGrupo::AtaqueDirecto:
+    default:
+        estado        = EstadoGrupo::Atacando;
+        break;
     }
 }
+
+void OleadaCadetes::inicializarRondas(int total)
+{
+    // Número de "sub-rondas" internas que podría manejar este agente.
+    totalRondas = (total > 0) ? total : 1;
+    rondaActual = 1;
+
+    // El agente arranca activo; aún no sabemos cuántos enemigos tiene
+    // hasta que hagamos spawnRonda.
+    activo             = true;
+    enemigosTotales    = 0;
+    enemigosRestantes  = 0;
+
+    // Estado base según el modo actual
+    switch (modo) {
+    case ModoGrupo::Campamento:
+    case ModoGrupo::Rotacion:
+        estado = EstadoGrupo::Preparando;
+        break;
+    case ModoGrupo::AtaqueDirecto:
+    default:
+        estado = EstadoGrupo::Atacando;
+        break;
+    }
+
+    // Estado interno específico para Rotación
+    if (modo == ModoGrupo::Rotacion) {
+        estadoRotacion = EstadoRotacion::EnCampamento;
+    }
+
+    // Reset de flags de acciones y coordinación
+    accionMoverActiva    = false;
+    accionDispararActiva = false;
+    pidiendoRefuerzo     = false;
+    llamadoPorOtraOleada = false;
+    municionGrupoActual  = 0;
+}
+
+//_______________________________________________________
+//--------------------------loop uptadte ------------------
+//------------------------------------------------------
 
 void OleadaCadetes::actualizar()
 {
+    if (!activo)
+        return;
 
-    enemigosRestantes = enemigosTotales;
-    for(auto *a : grupo){
-        if(!a) continue;
+    // Actualizar cuántos enemigos siguen vivos
+    actualizarEstadoVivosYMuertos();
 
-        if(a->muerto){
-            enemigosRestantes--;
-        }
-    }
-
-    if (enemigosRestantes == 0) {
-        activo = false;
-        estado = EstadoGrupo::Muerto;
+    if (estado == EstadoGrupo::Muerto || enemigosRestantes == 0) {
+        accionMoverActiva    = false;
+        accionDispararActiva = false;
         return;
     }
 
-    // Si el grupo ya está marcado como muerto, no hacemos nada
-    if (estado == EstadoGrupo::Muerto)
-        return;
+    // Por defecto, las acciones se apagan; el modo las prenderá si toca
+    accionMoverActiva    = false;
+    accionDispararActiva = false;
 
-    // Más adelante, si quieres, puedes también comprobar aquí
-    // si todos los cadetes de `grupo` están muertos y poner:
-    // estado = EstadoGrupo::Muerto;  (pero eso lo dejamos para luego)
-
+    // Traducir el modo en flags/acciones básicas
     switch (modo)
     {
     case ModoGrupo::AtaqueDirecto:
-
-        actualizarAtaqueDirecto();
-        break;
-
-    case ModoGrupo::Flanqueo:
-        actualizarFlanqueo();
+        actualizarModoAtaqueDirecto();
         break;
 
     case ModoGrupo::Campamento:
-        // MODO: CAMPAMENTO
-        //
-        //   - if (estado == EstadoGrupo::EnPosicion):
-        //         * el grupo se queda quieto o patrulla un poquito
-        //         * si el jugador entra en radioActivacion -> estado = Atacando
-        //
-        //   - if (estado == EstadoGrupo::Atacando):
-        //         * usar la lógica de persecución estándar hacia el jugador
+        actualizarModoCampamento();
         break;
 
+    case ModoGrupo::Rotacion:
+        actualizarModoRotacion();
+        break;
+
+    // Modos anteriores que aún puedas tener, por ahora se comportan
+    // como ataque directo para no dejar grupos "muertos":
+    case ModoGrupo::Flanqueo:
     case ModoGrupo::Emboscada:
-        actualizarEmboscada();
-        break;
-
-    default:
-        // Por si en el futuro aparece algún modo no manejado,
-        // de momento no hacemos nada.
+        actualizarModoAtaqueDirecto();
         break;
     }
 
-    // Más adelante, aquí podría ir algún chequeo común:
-    //   - contar cuántos cadetes siguen vivos en `grupo`
-    //   - si llega a 0 -> estado = EstadoGrupo::Muerto;
+    // Aplicar acciones básicas al grupo
+    if (accionMoverActiva)
+        aplicarAccionMover();
 
+    aplicarAccionDisparar();
+
+    // Mantener municionGrupoActual actualizado para decisiones futuras
+    actualizarMunicionGrupo();
 }
 
-void OleadaCadetes::actualizarAtaqueDirecto()
+void OleadaCadetes::actualizarEstadoVivosYMuertos()
 {
-    // Por ahora, solo queremos movernos cuando estamos atacando.
-    // Si más tarde quieres usar "Preparando" como ataque directo también,
-    // puedes permitir ambos estados.
-    if (estado != EstadoGrupo::Atacando &&
-        estado != EstadoGrupo::Preparando) {
-        return;
+    enemigosRestantes = 0;
+
+    for (FuerzaArmada *e : grupo) {
+        if (!e) continue;
+        if (e->estaMuerto()) continue;
+        ++enemigosRestantes;
     }
 
-    // paso base
-    const qreal step = 2.0;
+    if (enemigosRestantes == 0) {
+        activo               = false;
+        estado               = EstadoGrupo::Muerto;
+        accionMoverActiva    = false;
+        accionDispararActiva = false;
 
-    // radio mínimo de cercanía al jugador (en escena)
-    const qreal minDistJugador  = 25.0;
-    const qreal minDistJugador2 = minDistJugador * minDistJugador;
-
-    // radio de "espacio personal" entre cadetes (en escena)
-    const qreal radioSep  = 40.0;
-    const qreal radioSep2 = radioSep * radioSep;
-
-    for (auto *e : grupo) {
-        if (!e || e->muerto) continue;
-
-        // ----- POSICIONES -----
-        // local al fondo (para setPos)
-        QPointF  pLocalQ  = e->pos();
-        Vector2D posLocal(pLocalQ.x(), pLocalQ.y());
-
-        // en escena (jugador en 0,0)
-        Vector2D posScene(e->scenePos());
-
-        // ----- DIRECCIÓN BASE HACIA EL JUGADOR -----
-        Vector2D dirSeek = e->getDireccion();      // ya la calculas hacia el jugador en Nivel
-        if (dirSeek.magnitud2() == 0.0) continue;
-        dirSeek = dirSeek.normalizado();
-
-        // Si estamos demasiado cerca del jugador, no avanzamos más
-        if (posScene.magnitud2() <= minDistJugador2)
-            continue;
-
-        // ----- SEPARACIÓN ENTRE CADETES (espacio personal) -----
-        Vector2D dirSeparation = Vector2D::nulo();
-
-        for (auto *otro : grupo) {
-            if (!otro || otro == e || otro->muerto) continue;
-
-            Vector2D posOtherScene(otro->scenePos());
-            Vector2D diff = posScene - posOtherScene;
-            qreal dist2 = diff.magnitud2();
-
-            if (dist2 < 1e-3) {
-                // Están prácticamente en el mismo punto.
-                // Empujamos al cadete lateralmente (perpendicular a la dirección hacia el jugador)
-                Vector2D perp(-dirSeek.y(), dirSeek.x()); // perpendicular a dirSeek
-                if (perp.magnitud2() > 0.0) {
-                    perp = perp.normalizado();
-                    dirSeparation += perp * 5.0;  // empuje fuerte para separarlos
-                }
-            }
-            else if (dist2 < radioSep2) {
-                // Caso normal: separación suave inversa a la distancia
-                Vector2D push = diff / dist2;
-                dirSeparation += push;
-            }
-        }
-
-        // ----- COMBINAR: ir al jugador + separar amigos -----
-        Vector2D dirFinal = dirSeek + dirSeparation * 1.0;
-        if (dirFinal.magnitud2() == 0.0)
-            dirFinal = dirSeek;
-
-        dirFinal = dirFinal.normalizado();
-
-        // Propuesta de nueva posición local
-        Vector2D newLocal = posLocal + dirFinal * step;
-
-        // Nos movemos provisionalmente para chequear colisiones
-        e->setPos(newLocal.x(), newLocal.y());
-
-        QList<QGraphicsItem*> cols = e->collidingItems();
-        bool bloqueado = false;
-
-        for (QGraphicsItem *item : cols) {
-
-            // --- Obstáculo físico: usamos tu react_colision ---
-            if (auto *obs = dynamic_cast<Obstaculo*>(item)) {
-                bloqueado = true;
-
-                // Volver a la posición anterior
-                e->setPos(pLocalQ);
-
-                // Calcular nueva posición "deslizándose" alrededor
-                Vector2D react = react_colision(obs, e, step);
-                e->setPos(react.x(), react.y());
-                break; // con un obstáculo fuerte es suficiente para este frame
-            }
-
-            // --- Otro FuerzaArmada (jugador u otro cadete) ---
-            if (auto *fa = dynamic_cast<FuerzaArmada*>(item)) {
-                if (fa == e) continue; // ignorar self
-
-                // Por ahora: simplemente no empujamos, dejamos
-                // que la fuerza de separación haga el trabajo.
-                bloqueado = true;
-                e->setPos(pLocalQ);
-                break;
-            }
-        }
-
-        // Si no hubo bloqueos, e ya está en newLocal y no hay nada más que hacer
+        // En modo Rotación, también podemos marcar su estado interno como
+        // “fuera de combate”.
+        estadoRotacion       = EstadoRotacion::Huyendo;
+        pidiendoRefuerzo     = false;
+        llamadoPorOtraOleada = false;
     }
-
-    // Más adelante: aquí puedes revisar si todos los miembros del grupo
-    // están muertos y poner estado = EstadoGrupo::Muerto;
 }
 
-void OleadaCadetes::actualizarFlanqueo()
+void OleadaCadetes::actualizarModoAtaqueDirecto()
 {
-    // Si no tengo slots de flanqueo definidos, caigo al comportamiento estándar
-    if (puntosObjetivo.empty()) {
-        actualizarAtaqueDirecto();
-        return;
+    // Jugador asumido en (0,0) en coordenadas de escena
+    focoMovimiento       = Vector2D(0.0, 0.0);
+
+    // Siempre perseguimos al jugador
+    accionMoverActiva    = true;
+
+    // Queremos que el grupo esté en modo "disparando"
+    accionDispararActiva = true;
+
+    // Actualizamos cuántos cadetes tienen balas
+    actualizarMunicionGrupo();
+
+    // Si absolutamente nadie tiene munición, asignamos cargadores
+    if (municionGrupoActual == 0) {
+        const int balasPorCadete = 30;  // ajustable
+
+        for (FuerzaArmada *e : grupo) {
+            auto *c = dynamic_cast<Cadete*>(e);
+            if (!c || c->estaMuerto())
+                continue;
+
+            c->definirMunicion(balasPorCadete);
+        }
+
+        // Recalcular después de asignar
+        actualizarMunicionGrupo();
+    }
+}
+
+void OleadaCadetes::actualizarModoCampamento()
+{
+    // Punto de campamento: usamos el promedio de los puntos dados.
+    // Si no hay puntos definidos, tomamos (0,0) como fallback.
+    Vector2D campCenter = Vector2D::nulo();
+    if (!puntosCampamento.empty()) {
+        for (const auto &p : puntosCampamento)
+            campCenter += p;
+        campCenter /= static_cast<qreal>(puntosCampamento.size());
+    } else {
+        campCenter = Vector2D(0.0, 0.0);
     }
 
-    // El jugador está en (0,0) en coords de escena (según tu diseño)
-    const Vector2D posJugadorScene(0.0, 0.0);
+    Vector2D centroGrupo = calcularCentroGrupoScene();
+    Vector2D posJugador(0.0, 0.0);
 
-    // Paso de movimiento cuando están preparando
-    const qreal stepPrep = 3.0;
+    const qreal radioLlegadaCamp  = 65.0;
+    const qreal radioLlegadaCamp2 = radioLlegadaCamp * radioLlegadaCamp;
 
-    // Radio para considerar que un cadete "llegó" a su punto de flanqueo
-    const qreal radioLlegada        = 20.0;
-    const qreal radioLlegada2       = radioLlegada * radioLlegada;
-
-    // Radio de activación del ataque (distancia jugador–centro del grupo)
     const qreal radioAct = (radioActivacion > 0.0 ? radioActivacion : 220.0);
     const qreal radioAct2 = radioAct * radioAct;
 
@@ -277,289 +277,564 @@ void OleadaCadetes::actualizarFlanqueo()
     {
     case EstadoGrupo::Preparando:
     {
-        int enPosicion = 0;
-        int totalVivos = 0;
+        // Fase: ir al punto de campamento
+        focoMovimiento       = campCenter;
+        accionMoverActiva    = true;
+        accionDispararActiva = false;
 
-        // Para cada cadete, lo mandamos a su slot de flanqueo
-        for (std::size_t i = 0; i < grupo.size(); ++i) {
-            FuerzaArmada *e = grupo[i];
-            if (!e || e->muerto) continue;
-            ++totalVivos;
-
-            // Posiciones
-            QPointF  pLocalQ  = e->pos();
-            Vector2D posLocal(pLocalQ.x(), pLocalQ.y());
-            Vector2D posScene(e->scenePos());
-
-            // Slot de flanqueo en coordenadas de escena
-            // (si hay menos slots que soldados, usamos módulo)
-            const Vector2D &slotScene = puntosObjetivo[i % puntosObjetivo.size()];
-
-            // Vector hacia el slot
-            Vector2D toSlot = slotScene - posScene;
-            qreal dist2 = toSlot.magnitud2();
-
-            // ¿Ya está lo suficientemente cerca de su slot?
-            if (dist2 <= radioLlegada2) {
-                ++enPosicion;
-
-                // Solo orientamos hacia el jugador
-                Vector2D dirToPlayer = posJugadorScene - posScene;
-                if (dirToPlayer.magnitud2() > 0.0)
-                    e->setDireccion(dirToPlayer.normalizado());
-
-                continue;
-            }
-
-            // Dirección principal hacia el slot
-            Vector2D dir = toSlot.normalizado();
-
-            // --- Separación entre cadetes, igual que en AtaqueDirecto ---
-            const qreal radioSep  = 40.0;
-            const qreal radioSep2 = radioSep * radioSep;
-
-            Vector2D dirSeparation = Vector2D::nulo();
-
-            for (auto *otro : grupo) {
-                if (!otro || otro == e || otro->muerto) continue;
-
-                Vector2D posOtherScene(otro->scenePos());
-                Vector2D diff = posScene - posOtherScene;
-                qreal d2 = diff.magnitud2();
-
-                if (d2 < 1e-3) {
-                    // Muy pegados: empuje perpendicular a la dirección hacia el slot
-                    Vector2D perp(-dir.y(), dir.x());
-                    if (perp.magnitud2() > 0.0) {
-                        perp = perp.normalizado();
-                        dirSeparation += perp * 5.0;
-                    }
-                }
-                else if (d2 < radioSep2) {
-                    dirSeparation += diff / d2;
-                }
-            }
-
-            // Combinar ir al slot + separación
-            Vector2D dirFinal = dir + dirSeparation;
-            if (dirFinal.magnitud2() == 0.0)
-                dirFinal = dir;
-
-            dirFinal = dirFinal.normalizado();
-
-            // Propuesta nueva posición en coords locales (fondo)
-            Vector2D newLocal = posLocal + dirFinal * stepPrep;
-            e->setPos(newLocal.x(), newLocal.y());
-
-            // Colisiones con obstáculos (igual que en AtaqueDirecto)
-            QList<QGraphicsItem*> cols = e->collidingItems();
-            bool bloqueado = false;
-
-            for (QGraphicsItem *item : cols) {
-                if (auto *obs = dynamic_cast<Obstaculo*>(item)) {
-                    bloqueado = true;
-
-                    // Volver a la posición anterior
-                    e->setPos(pLocalQ);
-
-                    // Reacción de “deslizamiento”
-                    Vector2D react = react_colision(obs, e, stepPrep);
-                    e->setPos(react.x(), react.y());
-                    break;
-                }
-            }
-
-            // Actualizar dirección visual mirando al jugador
-            Vector2D dirToPlayer = posJugadorScene - Vector2D(e->scenePos());
-            if (dirToPlayer.magnitud2() > 0.0)
-                e->setDireccion(dirToPlayer.normalizado());
-        }
-
-        // ¿Suficientes cadetes ya en posición? -> cambiar a EnPosicion
-        if (totalVivos > 0) {
-            qreal ratio = static_cast<qreal>(enPosicion) /
-                          static_cast<qreal>(totalVivos);
-            if (ratio >= 0.7) {    // 70% ya llegó a su slot
-                estado = EstadoGrupo::EnPosicion;
-            }
+        // Si el centro del grupo ya está suficientemente cerca del campamento,
+        // consideramos que están "en posición".
+        Vector2D diffCamp = campCenter - centroGrupo;
+        if (diffCamp.magnitud2() <= radioLlegadaCamp2) {
+            estado = EstadoGrupo::EnPosicion;
         }
         break;
     }
 
     case EstadoGrupo::EnPosicion:
     {
-        // Grupo quieto, solo mirando al jugador.
-        // Cuando el jugador se acerca al centro del grupo -> empiezan a atacar.
+        /*
+         *
+        qDebug() << "        magnitud : | " << diffJugador.magnitud();
+        qDebug() << "dif = |" << diffJugador.x() << " , " << diffJugador.y();
+        qDebug() << " campoCenterScene " << campCenterSce.x() << " , " << campCenterSce.y();
+        qDebug() << " campoCenter " << campCenterSce.x() << " , " << campCenterSce.y();
+        qDebug() << " jugador "  << posJugador.x() << " , " << posJugador.y();
+        */
+        // Fase: quietos en campamento, sin disparar.
+        accionMoverActiva    = false;
+        accionDispararActiva = false;
 
-        Vector2D centro = calcularCentroGrupoScene();
-        Vector2D diff   = posJugadorScene - centro;
-
-        if (diff.magnitud2() <= radioAct2) {
+        // Si el jugador se acerca lo suficiente al campamento,
+        // activamos un ataque directo (y dejamos que el ciclo
+        // continúe como AtaqueDirecto de ahora en adelante).
+        Vector2D campCenterSce(nivel->getFondoScroll()->mapToScene(campCenter.toPointF()));
+        Vector2D diffJugador = posJugador - campCenterSce;
+        if (diffJugador.magnitud2() <= radioAct2) {
+            // Cambiamos el modo global del agente a AtaqueDirecto
+            // y dejamos que en el siguiente tick se use
+            // actualizarModoAtaqueDirecto().
+            modo   = ModoGrupo::AtaqueDirecto;
             estado = EstadoGrupo::Atacando;
+
+            // Opcionalmente, preconfiguramos ya el foco y flags:
+            focoMovimiento       = posJugador;
+            accionMoverActiva    = true;
+            accionDispararActiva = true;
         }
-
-        // Orientar a todos hacia el jugador
-        for (auto *e : grupo) {
-            if (!e || e->muerto) continue;
-
-            Vector2D posScene(e->scenePos());
-            Vector2D dirToPlayer = posJugadorScene - posScene;
-            if (dirToPlayer.magnitud2() > 0.0)
-                e->setDireccion(dirToPlayer.normalizado());
-        }
-
         break;
     }
 
     case EstadoGrupo::Atacando:
-        // Una vez activado el ataque, reutilizamos la lógica estándar
-        // de persecución (seek + separación + obstáculos)
-        actualizarAtaqueDirecto();
+        // Una vez que el campamento "salta" a ataque, simplemente
+        // delegamos en el comportamiento de ataque directo.
+        // (El switch principal de actualizar() será el que llame
+        // a actualizarModoAtaqueDirecto() en los frames siguientes.)
+        focoMovimiento       = posJugador;
+        accionMoverActiva    = true;
+        accionDispararActiva = true;
         break;
 
+    case EstadoGrupo::Muerto:
     default:
-        // Otros estados no hacen nada de momento
+        // Sin acciones: grupo ya no opera.
+        accionMoverActiva    = false;
+        accionDispararActiva = false;
         break;
     }
 }
 
-void OleadaCadetes::actualizarCampamento()
+void OleadaCadetes::actualizarModoRotacion()
 {
-    // Si el grupo ya está muerto, nada que hacer
-    if (estado == EstadoGrupo::Muerto)
-        return;
+    Vector2D posJugador(0.0, 0.0);
+    Vector2D centroGrupo = calcularCentroGrupoScene();
 
-    // 1) Si estamos en EN_POSICION:
-    //    - el grupo se queda quieto
-    //    - solo vigilamos si el jugador entra en radioActivacion
-    if (estado == EstadoGrupo::EnPosicion) {
 
-        // Jugador en (0,0) en coordenadas de escena (como venimos asumiendo)
-        Vector2D posJugador(0.0, 0.0);
 
-        // Centro del grupo (promedio de los cadetes vivos)
-        Vector2D centro(0.0, 0.0);
-        int vivos = 0;
+    // Centro de campamento para este grupo
+    Vector2D campCenter = Vector2D::nulo();
+    if (!puntosCampamento.empty()) {
+        for (const auto &p : puntosCampamento)
+            campCenter += p;
+        campCenter /= static_cast<qreal>(puntosCampamento.size());
+    } else {
+        campCenter = Vector2D(0.0, 0.0);
+    }
+    Vector2D campCenterSce(nivel->getFondoScroll()->mapToScene(campCenter.toPointF()));
 
-        for (auto *e : grupo) {
-            if (!e || e->muerto) continue;
+    const qreal radioAct = (radioActivacion > 0.0 ? radioActivacion : 220.0);
+    const qreal radioAct2 = radioAct * radioAct;
 
-            Vector2D ps(e->scenePos());
-            centro += ps;
-            ++vivos;
+    const qreal radioRetirada    = 25.0;
+    const qreal radioRetirada2   = radioRetirada * radioRetirada;
+
+    if (llamadoPorOtraOleada && estadoRotacion != EstadoRotacion::Huyendo) {
+        llamadoPorOtraOleada = false;
+        pidiendoRefuerzo     = false;
+
+        // Asegurar que haya munición
+        actualizarMunicionGrupo();
+        if (municionGrupoActual == 0) {
+            const int balasPorCadete = 20;   // mismo número que usas en Rotación
+            for (FuerzaArmada *e : grupo) {
+                auto *c = dynamic_cast<Cadete*>(e);
+                if (!c || c->estaMuerto())
+                    continue;
+                c->definirMunicion(balasPorCadete);
+            }
+            actualizarMunicionGrupo();
         }
 
-        if (vivos == 0) {
-            // No queda nadie en el grupo → se marca como muerto e inactivo
-            estado = EstadoGrupo::Muerto;
-            activo = false;
-            return;
-        }
-
-        centro /= static_cast<qreal>(vivos);
-
-        Vector2D diff = centro - posJugador;
-        qreal dist2   = diff.magnitud2();
-        qreal radio2  = radioActivacion * radioActivacion;
-
-        // ¿El jugador ha entrado en el radio de activación?
-        if (dist2 <= radio2) {
-            // El grupo reacciona y pasa a Atacando
-            estado = EstadoGrupo::Atacando;
-        } else {
-            // Todavía no ha entrado → se quedan camperos ahí quietos
-            // (Aquí podrías meter una patrulla suave si quieres)
-            return;
-        }
+        estadoRotacion       = EstadoRotacion::Atacando;
+        focoMovimiento       = posJugador;
+        accionMoverActiva    = true;
+        accionDispararActiva = true;
     }
 
-    // 2) Si estamos en ATACANDO:
-    //    - reusamos la lógica estándar de persecución (igual que AtaqueDirecto)
-    if (estado == EstadoGrupo::Atacando) {
-        actualizarAtaqueDirecto();
-    }
-
-    // 3) Si el estado fuese Preparando podríamos, en el futuro,
-    //    hacer que se muevan a puntosObjetivo y luego pasar a EnPosicion.
-    //    De momento asumimos que los grupos de Campamento se crean directamente
-    //    en estado EnPosicion.
-}
-
-void OleadaCadetes::actualizarEmboscada()
-{
-    // Si ya está muerto el grupo, nada que hacer
-    if (estado == EstadoGrupo::Muerto)
-        return;
-
-    // Filosofía:
-    //  - El NIVEL solo hace: setModo(ModoGrupo::Emboscada) y, si acaso, setActivo(true)
-    //  - El GRUPO decide internamente qué hacer con su estado.
-
-    // En este diseño simple:
-    //  - Si nos acaban de poner en Emboscada y estábamos "quietos"
-    //    (Preparando o EnPosicion), nosotros mismos decidimos empezar a atacar.
-    if (estado == EstadoGrupo::Preparando ||
-        estado == EstadoGrupo::EnPosicion)
+    switch (estadoRotacion)
     {
-        estado = EstadoGrupo::Atacando;
+    case EstadoRotacion::EnCampamento:
+    {
+        // Igual que un campamento normal:
+        // ir al campCenter y esperar al jugador.
+        focoMovimiento       = campCenter;
+        accionMoverActiva    = true;
+        accionDispararActiva = false;
+
+        // ¿El jugador se acercó al campamento?
+        Vector2D diffJugador = posJugador - campCenterSce;
+        if (diffJugador.magnitud2() <= radioAct2) {
+            // Pasar a fase de ataque dentro del modo Rotación.
+            estadoRotacion      = EstadoRotacion::Atacando;
+            accionMoverActiva    = true;
+            accionDispararActiva = true;
+            focoMovimiento       = posJugador;
+
+            // Asignar munición inicial a cada cadete del grupo
+            const int balasPorCadete = 20;  // puedes ajustar distinto a AtaqueDirecto
+
+            for (FuerzaArmada *e : grupo) {
+                auto *c = dynamic_cast<Cadete*>(e);
+                if (!c || c->estaMuerto())
+                    continue;
+
+                c->definirMunicion(balasPorCadete);
+            }
+
+            // Recalcular la munición agregada del grupo
+            actualizarMunicionGrupo();
+        }
+        break;
     }
 
-    // Una vez estamos en Atacando, reutilizamos la lógica estándar
-    if (estado == EstadoGrupo::Atacando) {
-        actualizarAtaqueDirecto();
+    case EstadoRotacion::Atacando:
+    {
+        // Fase de presión: ir hacia el jugador + disparar.
+        focoMovimiento       = posJugador;
+        accionMoverActiva    = true;
+        accionDispararActiva = true;
+
+        // Actualizar munición agregada para decidir retirada
+        actualizarMunicionGrupo();
+
+        // Criterios de retirada: sin munición o grupo muy reducido.
+        if (municionGrupoActual == 0 || enemigosRestantes <= enemigosTotales/2) {
+            enemigosTotales = 0;
+            estadoRotacion      = EstadoRotacion::Huyendo;
+            accionDispararActiva = false;
+            accionMoverActiva    = true;
+            focoMovimiento       = puntoRetirada;
+
+            // Levantamos la petición de relevo para que Nivel lo vea.
+            pidiendoRefuerzo     = true;
+        }
+        break;
     }
 
-    // (Más adelante, si quieres emboscadas más finas, aquí puedes:
-    //  - hacer que primero se reorganicen a una posición
-    //  - usar otra velocidad
-    //  - etc.)
+    case EstadoRotacion::Huyendo:
+    {
+        // Fase de huida hacia puntoRetirada.
+        focoMovimiento       = puntoRetirada;
+        accionMoverActiva    = true;
+        accionDispararActiva = false;
+
+        // ¿Ya llegamos lo bastante cerca del punto de retirada?
+        Vector2D diffRet = puntoRetirada - centroGrupo;
+        if (diffRet.magnitud2() <= radioRetirada2) {
+            // Entramos en fase de "esperando orden" (recargando).
+            estadoRotacion       = EstadoRotacion::EnCampamento;
+            accionMoverActiva    = false;
+            accionDispararActiva = false;
+
+            // Recargar a todos los cadetes vivos
+            for (FuerzaArmada *e : grupo) {
+                auto *c = dynamic_cast<Cadete*>(e);
+                if (!c || c->estaMuerto())
+                    continue;
+                c->recargar();
+            }
+
+            // Actualizamos la munición agregada (debería ser > 0 ahora)
+            actualizarMunicionGrupo();
+        }
+        break;
+    }
+
+    case EstadoRotacion::EsperandoOrden:
+    {
+        // Grupo replegado y recargado, esperando a que Nivel lo
+        // "llame" para volver al frente.
+        accionMoverActiva    = false;
+        accionDispararActiva = false;
+        // El "llamadoPorOtraOleada" ya se procesó al inicio de la función
+        break;
+    }
+    }
 }
 
+bool OleadaCadetes::todosEnCampamento() const
+{
+    // Si no hay puntos definidos, consideramos que no hay nada que comprobar.
+    if (puntosCampamento.empty())
+        return true;
+
+    const qreal radioLlegadaCamp  = 25.0;
+    const qreal radioLlegadaCamp2 = radioLlegadaCamp * radioLlegadaCamp;
+
+    for (FuerzaArmada *e : grupo) {
+        if (!e || e->estaMuerto())
+            continue;
+
+        Vector2D posScene(e->scenePos());
+
+        // Buscar el punto de campamento más cercano
+        qreal minDist2 = std::numeric_limits<qreal>::max();
+        for (const auto &p : puntosCampamento) {
+            qreal d2 = (posScene - p).magnitud2();
+            if (d2 < minDist2)
+                minDist2 = d2;
+        }
+
+        // Si este cadete está demasiado lejos de todos los puntos, aún no estamos "en campamento"
+        if (minDist2 > radioLlegadaCamp2)
+            return false;
+    }
+
+    return true;
+}
+
+bool OleadaCadetes::rondaCompletada() const
+{
+    return (enemigosRestantes == 0);
+}
+
+// ===================================================
+//  ACCIÓN BÁSICA: MOVER (ir hacia focoMovimiento)
+// ===================================================
+
+void OleadaCadetes::aplicarAccionMover()
+{
+    if (!accionMoverActiva)
+        return;
+
+    for (FuerzaArmada *e : grupo) {
+        if (!e || e->estaMuerto())
+            continue;
+
+        Vector2D dirBase = Vector2D::nulo();
+        // Dirección base hacia el foco (jugador, campamento, retirada...)
+        if( modo == ModoGrupo::AtaqueDirecto ) dirBase = calcularDireccionHaciaJugador(e);
+        else if ( modo == ModoGrupo::Rotacion && estadoRotacion == EstadoRotacion::Atacando ) dirBase = calcularDireccionHaciaJugador(e);
+        else dirBase = calcularDireccionHaciaFoco(e);
+        if (dirBase.magnitud2() == 0.0)
+            continue;
+
+        // Separación con respecto a otros cadetes
+        Vector2D dirSep  = calcularSeparacion(e);
+
+        // Combinar ambas direcciones
+        Vector2D dirFinal = combinarDirecciones(dirBase, dirSep);
+        if (dirFinal.magnitud2() == 0.0)
+            dirFinal = dirBase;
+
+        // Paso según velocidad propia de la unidad
+        qreal step = e->getVelocidad();
+        if (step <= 0.0) step = 1.0;
+
+        moverUnidadConColisiones(e, dirFinal, step);
+    }
+}
+
+// ===================================================
+//  ACCIÓN BÁSICA: DISPARAR (encender / apagar flag)
+// ===================================================
+
+void OleadaCadetes::aplicarAccionDisparar()
+{
+    for (FuerzaArmada *e : grupo) {
+        auto *c = dynamic_cast<Cadete*>(e);
+        if (!c || c->estaMuerto())
+            continue;
+
+        if (accionDispararActiva) {
+            // La lógica fina de munición / cooldown se hará aparte.
+            // Aquí solo dejamos marcado que este cadete está en modo “disparando”.
+            c->setDisparando(true);
+        } else {
+            c->setDisparando(false);
+        }
+    }
+}
+
+// ---------------------------------------------------
+//  Recalcular “municionGrupoActual”
+//  (aquí lo interpretamos como: cuántos cadetes tienen balas)
+// ---------------------------------------------------
+
+void OleadaCadetes::actualizarMunicionGrupo()
+{
+    municionGrupoActual = 0;
+
+    for (FuerzaArmada *e : grupo) {
+        auto *c = dynamic_cast<Cadete*>(e);
+        if (!c || c->estaMuerto())
+            continue;
+
+        if (c->tieneMunicion())
+            ++municionGrupoActual;
+    }
+}
+
+// ===================================================
+//  HELPERS DE MOVIMIENTO / STEERING
+// ===================================================
+
+// Dirección desde el cadete hacia focoMovimiento
+Vector2D OleadaCadetes::calcularDireccionHaciaJugador(FuerzaArmada *e) const
+{
+    // Asumimos que focoMovimiento está en coordenadas locales
+    Vector2D centro = calcularCentroGrupoScene();
+
+    Vector2D pos_= Vector2D::nulo();
+    if(e != nullptr) pos_ = Vector2D(e->scenePos());
+    else pos_ = centro;
+    Vector2D toTarget = pos_*-1.0;
+
+    if (toTarget.magnitud2() == 0.0)
+        return Vector2D::nulo();
+
+    return toTarget.normalizado();
+}
+
+Vector2D OleadaCadetes::calcularDireccionHaciaFoco(FuerzaArmada *e) const
+{
+    // Asumimos que focoMovimiento está en coordenadas locales
+    Vector2D pos_ (e->pos());
+    Vector2D toTarget = focoMovimiento - pos_;
+
+    if (toTarget.magnitud2() == 0.0)
+        return Vector2D::nulo();
+
+    return toTarget.normalizado();
+}
+
+// Separación con respecto a otros cadetes del grupo
+Vector2D OleadaCadetes::calcularSeparacion(FuerzaArmada *e) const
+{
+    const qreal radioSep  = 40.0;
+    const qreal radioSep2 = radioSep * radioSep;
+
+    Vector2D posScene(e->scenePos());
+    Vector2D dirRef = e->getDireccion();
+    if (dirRef.magnitud2() > 0.0)
+        dirRef = dirRef.normalizado();
+
+    Vector2D acumulado = Vector2D::nulo();
+
+    for (FuerzaArmada *otro : grupo) {
+        if (!otro || otro == e || otro->estaMuerto())
+            continue;
+
+        Vector2D posOther(otro->scenePos());
+        Vector2D diff = posScene - posOther;
+        qreal dist2 = diff.magnitud2();
+
+        if (dist2 < 1e-3) {
+            // Están casi encima: empuje perpendicular a la dirección de referencia
+            if (dirRef.magnitud2() > 0.0) {
+                Vector2D perp(-dirRef.y(), dirRef.x());
+                if (perp.magnitud2() > 0.0) {
+                    perp = perp.normalizado();
+                    acumulado += perp * 5.0;
+                }
+            }
+        }
+        else if (dist2 < radioSep2) {
+            // Separación suave proporcional a 1/distancia
+            acumulado += diff / dist2;
+        }
+    }
+
+    return acumulado;
+}
+
+// Suma base + separación y normaliza
+Vector2D OleadaCadetes::combinarDirecciones(const Vector2D &base,
+                                            const Vector2D &sep) const
+{
+    Vector2D out = base + sep;
+    if (out.magnitud2() == 0.0)
+        return base;
+    return out.normalizado();
+}
+
+// Mover con colisiones contra Obstaculo / otras FuerzaArmada
+void OleadaCadetes::moverUnidadConColisiones(FuerzaArmada *e,
+                                             const Vector2D &dir,
+                                             qreal step)
+{
+    if (!e || e->estaMuerto())
+        return;
+
+    if (dir.magnitud2() == 0.0 || step <= 0.0)
+        return;
+
+    Vector2D dirNorm = dir.normalizado();
+
+    e->setDireccion(dirNorm);
+
+    // Posición local (respecto al parent, que suele ser el fondo)
+    QPointF posLocalQ = e->pos();
+    Vector2D posLocal(posLocalQ.x(), posLocalQ.y());
+
+    Vector2D newLocal = posLocal + dirNorm * step;
+    e->setPos(newLocal.x(), newLocal.y());
+
+    QList<QGraphicsItem*> cols = e->collidingItems();
+
+    for (QGraphicsItem *item : cols) {
+        if (auto *obs = dynamic_cast<Obstaculo*>(item)) {
+            // Obstáculo físico: usamos reacción específica
+            e->setPos(posLocalQ);
+            Vector2D react = reaccionarColision(obs, e, step);
+            e->setPos(react.x(), react.y());
+            return;
+        }
+
+        if (auto *fa = dynamic_cast<FuerzaArmada*>(item)) {
+            if (fa == e) continue;
+            // Otra unidad: retrocedemos y que la separación lo arregle
+            e->setPos(posLocalQ);
+            return;
+        }
+    }
+}
+
+// ===================================================
+//  HELPERS GEOMÉTRICOS / COLISIÓN
+// ===================================================
+
+// Centro del grupo en coordenadas de escena
 Vector2D OleadaCadetes::calcularCentroGrupoScene() const
 {
     Vector2D acumulado = Vector2D::nulo();
     int conteo = 0;
 
-    for (auto *e : grupo) {
-        if (!e || e->muerto) continue;
+    for (FuerzaArmada *e : grupo) {
+        if (!e || e->estaMuerto())
+            continue;
 
-        Vector2D p(e->scenePos());
-        acumulado += p;
+        acumulado += Vector2D(e->pos());
         ++conteo;
     }
 
-    if (conteo == 0) return Vector2D::nulo();
+    if (conteo == 0)
+        return Vector2D::nulo();
+
     return acumulado / static_cast<qreal>(conteo);
 }
 
-Vector2D OleadaCadetes::react_colision(Obstaculo* obs, FuerzaArmada* cadet, qreal step){
-
-
-    // pos local (respecto al fondo)
+// Reacción al chocar con un obstáculo (misma idea que tu react_colision)
+Vector2D OleadaCadetes::reaccionarColision(Obstaculo *obs,
+                                           FuerzaArmada *cadet,
+                                           qreal step)
+{
+    // Pos local actual del cadete
     Vector2D pos_act(cadet->pos().x(), cadet->pos().y());
 
     Vector2D dir_act = cadet->getDireccion();
-    if (dir_act.magnitud2() == 0.0) return pos_act;
+    if (dir_act.magnitud2() == 0.0)
+        return pos_act;
+
+    // "Normal" aproximada usando la posición del obstáculo (simplificado)
     Vector2D dir_normal_obs(obs->scenePos());
     dir_normal_obs = dir_normal_obs.normalizado().getNormal();
 
     qreal dot = dir_act.dot(dir_normal_obs);
-    //qDebug() << "dir cadete : x " << dir_act.x() << " y " << dir_act.y();
-    //qDebug() << "dir normal obs : x " << dir_normal_obs.x() << " y " << dir_normal_obs.y();
-    //qDebug() << "dot : " << dot;
-
-    Vector2D new_pos = pos_act;
-
     dir_act = dir_act.normalizado();
-    if(dot >= 0)
-        new_pos = pos_act + (dir_act - dir_normal_obs).normalizado()*step;
+
+    Vector2D new_pos;
+
+    if (dot >= 0)
+        new_pos = pos_act + (dir_act - dir_normal_obs).normalizado() * step;
     else
-        new_pos = pos_act + (dir_act + dir_normal_obs).normalizado()*step;
+        new_pos = pos_act + (dir_act + dir_normal_obs).normalizado() * step;
 
     return new_pos;
-
 }
 
-bool OleadaCadetes::rondaCompletada() const {
-    return enemigosRestantes == 0;
+bool OleadaCadetes::disponibleParaRelevo() const
+{
+    // Solo tiene sentido en modo Rotación
+    if (modo != ModoGrupo::Rotacion)
+        return false;
+
+    // Sin enemigos, no hay a quién mandar
+    if (enemigosRestantes <= 0)
+        return false;
+
+    // Disponible si ya está en fase EsperandoOrden (ya replegado y recargado)
+    return (estadoRotacion == EstadoRotacion::EsperandoOrden);
 }
+
+
+// ===================================================
+//  Configuración básica desde Nivel (implementación)
+// ===================================================
+
+void OleadaCadetes::setPuntosCampamento(const std::vector<Vector2D> &puntos)
+{
+    puntosCampamento = puntos;
+}
+
+void OleadaCadetes::setPuntoRetirada(const Vector2D &p)
+{
+    puntoRetirada = p;
+}
+
+void OleadaCadetes::setRadioActivacion(qreal r)
+{
+    radioActivacion = r;
+}
+
+bool OleadaCadetes::estaHuyendo() const
+{
+    return (modo == ModoGrupo::Rotacion &&
+            estadoRotacion == EstadoRotacion::Huyendo &&
+            enemigosRestantes > 0);
+}
+
+void OleadaCadetes::marcarLlamadoPorOtraOleada()
+{
+    // Solo tiene sentido marcar apoyo si el grupo no está huyendo ni muerto
+    if (enemigosRestantes <= 0) return;
+    if (estadoRotacion == EstadoRotacion::Huyendo) return;
+
+    llamadoPorOtraOleada = true;
+}
+
+Vector2D OleadaCadetes::centroGrupoScene() const
+{
+    return calcularCentroGrupoScene();
+}
+
