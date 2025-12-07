@@ -5,11 +5,10 @@
 #include <QVector>
 #include <QPointF>
 #include <QSoundEffect>
+#include <QTimer>
 #include "barco.h"
 #include "obstaculon2.h"
 #include "torpedo.h"
-
-class QTimer;
 
 class NivelIso : public QWidget
 {
@@ -34,14 +33,16 @@ signals:
     void volverAlMenu();
 
 private:
+    // Constantes de renderizado
+    static constexpr int BARCO_PROFUNDIDAD = 40;
+    static constexpr int BARCO_ANCHO = 20;
+    static constexpr int OBS_PROFUNDIDAD = 40;
+    static constexpr int OBS_ANCHO = 20;
+
     void initScene();
     void updateBarcoFromInput();
     void updateCollisions();
-    void drawHitbox(QPainter &painter,
-                    const Hitbox &hitbox,
-                    const QPointF &worldPos);
-
-    // Funciones para el sistema de scrolling
+    void drawHitbox(QPainter &painter, const Hitbox &hitbox, const QPointF &worldPos);
     void updateObstaculos();
     void generarNuevosObstaculos();
     void dibujarFondoScrolling(QPainter &painter);
@@ -51,26 +52,24 @@ private:
     void reiniciarNivel();
     void mostrarVictoria();
     void mostrarGameOver();
-
-    // Funciones para torpedos
     void dispararTorpedo();
     void updateTorpedos();
     void verificarColisionesTorpedos();
     void updateDificultad();
+    void cargarSonidos();
+    void cargarSonidosDesdeArchivos();
 
     Barco m_barco;
     QVector<Obstaculon2> m_obstaculos;
     QVector<Torpedo> m_torpedos;
     QTimer *m_timer;
 
-    // Input
     bool m_moveLeft;
     bool m_moveRight;
     bool m_sprint;
 
     QRectF m_playArea;
 
-    // Variables para scrolling
     qreal m_scrollOffset;
     qreal m_scrollSpeed;
     qreal m_scrollSpeedBase;
@@ -79,37 +78,28 @@ private:
     qreal m_limiteGeneracion;
     int m_contadorFrames;
 
-    // Sistema de vidas
     int m_vidas;
     int m_vidasMaximas;
     bool m_invulnerable;
     int m_contadorInvulnerabilidad;
 
-    // Sistema de tiempo y victoria
     int m_tiempoTranscurrido;
     int m_tiempoParaGanar;
     bool m_nivelCompletado;
 
-    // Sistema de disparo
     int m_cooldownDisparo;
     int m_cooldownActual;
 
-    // Sistema de munición
     int m_municionActual;
     int m_municionMaxima;
     int m_contadorRecarga;
     int m_tiempoRecarga;
 
-    // Dificultad progresiva
     int m_frecuenciaGeneracion;
     int m_cantidadObstaculos;
 
-    // Sistema de sonido
     QSoundEffect *m_sonidoDisparo;
-    QSoundEffect *m_sonidoExplosion;  // Cuando torpedo destruye obstáculo
-
-    void cargarSonidosDesdeArchivos();
-    void cargarSonidos();
+    QSoundEffect *m_sonidoExplosion;
 };
 
 #endif // NIVELISO_H

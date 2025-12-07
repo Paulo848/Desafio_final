@@ -32,7 +32,7 @@ else: unix:!android: target.path = /opt/$${TARGET}/bin
 
 RESOURCES += \
     assets/ui.qrc \
+    resources.qrc \
 
-RESOURCES += resources.qrc
 
 
