@@ -1,33 +1,63 @@
 #include "obstaculo.h"
 
-Obstaculo::Obstaculo()
-    : m_position(0.0, 0.0)
+// =========================
+//    CIRCULAR
+// =========================
+Obstaculo::Obstaculo(qreal _radio)
+    : forma(FormaObstaculo::Circulo),
+    radio(_radio),
+    ancho(0),
+    alto(0)
 {
-    // Hitbox inicial sencilla: rectángulo tipo roca
-    QVector<QPointF> puntos;
-    puntos << QPointF(-15, -15)
-           << QPointF( 15, -15)
-           << QPointF( 15,  15)
-           << QPointF(-15,  15);
-    m_hitbox.setLocalPoints(puntos);
+    bounds = QRectF(-radio, -radio, 2*radio, 2*radio);
+    setPos(0, 0); // Posición se ajusta externamente
 }
 
-void Obstaculo::setPosition(const QPointF &pos)
+
+// =========================
+//    RECTANGULAR
+// =========================
+Obstaculo::Obstaculo(qreal _ancho, qreal _alto)
+    : forma(FormaObstaculo::Rectangulo),
+    radio(0),
+    ancho(_ancho),
+    alto(_alto)
 {
-    m_position = pos;
+    bounds = QRectF(-ancho/2.0, -alto/2.0, ancho, alto);
+    setPos(0, 0);
 }
 
-QPointF Obstaculo::position() const
+
+// =========================
+//    SHAPE (colisión real)
+// =========================
+QPainterPath Obstaculo::shape() const
 {
-    return m_position;
+    QPainterPath path;
+    if (forma == FormaObstaculo::Circulo)
+        path.addEllipse(bounds);
+    else
+        path.addRect(bounds);
+
+    return path;
 }
 
-Hitbox &Obstaculo::hitbox()
-{
-    return m_hitbox;
-}
 
-const Hitbox &Obstaculo::hitbox() const
+// =========================
+//       DIBUJO
+// =========================
+void Obstaculo::paint(QPainter *p,
+                      const QStyleOptionGraphicsItem *,
+                      QWidget *)
 {
-    return m_hitbox;
+    p->setPen(Qt::NoPen);
+
+    if (forma == FormaObstaculo::Circulo) {
+        p->setBrush(QColor(Qt::red));  // gris piedra
+        p->drawEllipse(bounds);
+    }
+    else {
+        p->setBrush(QColor(Qt::yellow));   // marrón tierra/madera
+        p->drawRect(bounds);
+    }
 }

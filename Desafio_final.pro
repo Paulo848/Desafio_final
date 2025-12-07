@@ -12,6 +12,7 @@ include(src/entities/entities.pri)
 include(src/levels/levels.pri)
 include(src/utilities/utilities.pri)
 include(src/core/core.pri)
+include(src/groups/groups.pri)
 
 SOURCES += \
     src/main.cpp \

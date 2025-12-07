@@ -48,14 +48,14 @@ void MainWindow::cargarNivel1()
     }
 
     // Crear nuevo nivel
-    nivelActual = new Nivel(1, this);
-    connect(nivelActual, &Nivel::volverAlMenu, this, &MainWindow::mostrarMenuPrincipal);
+    nivelActual_ = new Nivel_1(1, this);
+    connect(nivelActual_, &Nivel_1::volverAlMenu, this, &MainWindow::mostrarMenuPrincipal);
 
     // Agregar nivel al contenedor
-    contenedor->addWidget(nivelActual);
+    contenedor->addWidget(nivelActual_);
 
     // Cambiar a la página del nivel
-    contenedor->setCurrentWidget(nivelActual);
+    contenedor->setCurrentWidget(nivelActual_);
 }
 
 void MainWindow::cargarNivel2()

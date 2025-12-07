@@ -13,6 +13,7 @@ qmake_*
 qrc_*
 Makefile*
 *-Build-*
+*.png
 
 # Directorios de build (qmake genera estos)
 build*/

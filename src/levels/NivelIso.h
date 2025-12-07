@@ -5,7 +5,7 @@
 #include <QVector>
 #include <QPointF>
 #include "barco.h"
-#include "obstaculo.h"
+#include "obstaculon2.h"
 
 class QTimer;
 
@@ -41,7 +41,7 @@ private:
     QPoint static toScreen();
 
     Barco m_barco;
-    QVector<Obstaculo> m_obstaculos;
+    QVector<Obstaculon2> m_obstaculos;
     QTimer *m_timer;
 
     // Input simple

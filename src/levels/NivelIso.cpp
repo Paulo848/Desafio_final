@@ -77,17 +77,17 @@ void NivelIso::initScene()
     m_obstaculos.clear();
 
     // Obstáculo ejemplo 1
-    Obstaculo o1;
+    Obstaculon2 o1;
     o1.setPosition(QPointF(150.0, 0.0));
     m_obstaculos.append(o1);
 
     // Obstáculo ejemplo 2
-    Obstaculo o2;
+    Obstaculon2 o2;
     o2.setPosition(QPointF(-100.0, 50.0));
     m_obstaculos.append(o2);
 
     // Obstáculo ejemplo 3
-    Obstaculo o3;
+    Obstaculon2 o3;
     o3.setPosition(QPointF(50.0, 120.0));
     m_obstaculos.append(o3);
 
@@ -172,7 +172,7 @@ void NivelIso::paintEvent(QPaintEvent *event)
     painter.restore();
 
     // Dibujar obstáculos (mismo patrón que el barco: centro → translate → rectángulo local)
-    for (const Obstaculo &o : m_obstaculos) {
+    for (const Obstaculon2 &o : m_obstaculos) {
         QPointF oWorld = o.position();
         QPointF oScreen = ProyeccionIso::toScreen(oWorld);
 
@@ -192,7 +192,7 @@ void NivelIso::paintEvent(QPaintEvent *event)
     // Dibujar hitboxes (verde si no colisiona, rojo si está en colisión)
     drawHitbox(painter, m_barco.hitbox(), m_barco.position());
 
-    for (const Obstaculo &o : m_obstaculos) {
+    for (const Obstaculon2 &o : m_obstaculos) {
         drawHitbox(painter, o.hitbox(), o.position());
     }
 }
@@ -317,12 +317,12 @@ void NivelIso::updateCollisions()
 {
     // Resetear estado de colisión en todas las hitboxes
     m_barco.hitbox().setColliding(false);
-    for (Obstaculo &o : m_obstaculos) {
+    for (Obstaculon2 &o : m_obstaculos) {
         o.hitbox().setColliding(false);
     }
 
     // Revisar barco vs cada obstáculo (colisión por hitbox en mundo 2D)
-    for (Obstaculo &o : m_obstaculos) {
+    for (Obstaculon2 &o : m_obstaculos) {
         bool col = m_barco.hitbox().intersects(
             o.hitbox(),
             m_barco.position(),

@@ -1,5 +1,6 @@
 <RCC>
     <qresource prefix="/ui">
         <file>ui/Fondo_Nivel_3.png</file>
+        <file>ui/Fondo1.png</file>
     </qresource>
 </RCC>

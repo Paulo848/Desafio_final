@@ -1,36 +1,59 @@
 #ifndef FUERZAARMADA_H
 #define FUERZAARMADA_H
-#include <QObject>
-#include <QGraphicsPixmapItem>
-#include <QPixmap>
-#include <QGraphicsView>
-#include <QTimer>
 
-class FuerzaArmada:public QObject, public QGraphicsPixmapItem
+#include <QGraphicsItem>
+#include <QPainter>
+#include "vector2d.h"
+
+class Proyectil;
+
+class FuerzaArmada : public QGraphicsItem
 {
-
-    Q_OBJECT
 protected:
-    qreal x = 200;
-    qreal y = 200;
-
-private:
-    int spriteX = 0;
-    int spriteY = 0;
-    int spriteAncho = 60;
-    int spriteAlto = 60;
-    QPixmap hojaSprites;
-    QPixmap sprite;
-    int cont=0;
-    QSize limites;
-    QTimer *timerMov;
-    int dx, dy;
-    QGraphicsView *vista;
-    // Municion array<int, canBalas >
+    Vector2D direccion;    // Unitario
+    qreal    radio;        // Para hitbox circular
+    int      vida = 10;
+    qreal    velocidad;
+    bool     jugador;
 
 public:
-    virtual short int getMunucion();
+    bool muerto;
 
+    FuerzaArmada(qreal r = 10.0, bool EsJugador = false, qreal vida = 10);
+
+    // ----- MOVIMIENTO -----
+    inline void setDireccion(const Vector2D &d) {
+        if (d.magnitud2() > 0.0)
+            direccion = d.normalizado();
+    }
+
+    inline Vector2D getDireccion() const { return direccion; }
+
+    inline void setVelocidad(qreal v) { velocidad = v; }
+    inline qreal getVelocidad() const { return velocidad; }
+
+    // ----- VIDA -----
+    inline void setVida(int v) { vida = v; }
+    inline int  getVida() const { return vida; }
+
+    // ----- ESTADO GENERAL (NUEVO) -----
+    inline bool estaMuerto() const { return muerto; }
+
+    // Helpers genéricos de daño/muerte (NUEVO)
+    void recibirDanio(int d);
+    void morir();
+
+    // ----- GRAFICOS -----
+    QRectF boundingRect() const override;
+    QPainterPath shape() const override;
+
+    virtual void paint(QPainter *painter,
+                       const QStyleOptionGraphicsItem *option,
+                       QWidget *widget) override;
+
+    //---- Colisiones -----
+    virtual void recibirImpacto(Proyectil* p) = 0;
+    virtual bool esJugador() const = 0;
 };
 
 #endif // FUERZAARMADA_H
