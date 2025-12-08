@@ -11,6 +11,9 @@
 #include <QDebug>
 #include <QMouseEvent>
 #include <QRandomGenerator>
+#include <QDir>
+#include <QCoreApplication>
+#include <QFile>
 #include <algorithm>
 
 #include "bala.h"
@@ -38,11 +41,17 @@ Nivel::Nivel(int numeroNivel, QWidget *parent, qreal _v_alto, qreal _v_ancho)
     m_moveUp(false),
     m_moveDown(false),
     ronda_act(1),
-    total_rondas(4)
+    total_rondas(4),
+    m_sonidoAmbiente(nullptr)
 {
     // Setup UI/escena/nivel
     inicializarUI();
     inicializarEscena();
+    cargarElementosNivel();
+
+    // Cargar sonidos
+    cargarSonidos();
+
     cargarElementosNivel();
 
     // Timer principal
@@ -54,6 +63,13 @@ Nivel::Nivel(int numeroNivel, QWidget *parent, qreal _v_alto, qreal _v_ancho)
 Nivel::~Nivel()
 {
     if (timer) timer->stop();
+
+    // Limpia sonidos
+    if (m_sonidoAmbiente) {
+        m_sonidoAmbiente->stop();
+        delete m_sonidoAmbiente;
+        m_sonidoAmbiente = nullptr;
+    }
 
     // Borrar enemigos
     for (auto e : enemigos) delete e;
@@ -244,6 +260,14 @@ void Nivel::actualizarPosicionFondo()
     // Reposicionar fondo por cámara
     Vector2D origenFondo = (viewportSize / -2.0) - camara;
     fondoScroll->setPos(origenFondo.x(), origenFondo.y());
+}
+
+void Nivel::actualizarIA()
+{
+    //Actualizar agentes activos
+    for(auto *a : agentes)
+        if(a && a->estaActivo())
+            a->actualizar();
 }
 
 void Nivel::actualizarOleadas()
@@ -463,11 +487,13 @@ bool Nivel::jugadorTocaObstaculo() const
 
 
 void Nivel::manejarColisiones() {}
-void Nivel::actualizarIA() {}
 void Nivel::onVolverClicked()
 {
     // Volver al menú
     if (timer) timer->stop();
+    if (m_sonidoAmbiente) {
+        m_sonidoAmbiente->stop();
+    }
     emit volverAlMenu();
 }
 
@@ -812,6 +838,71 @@ void Nivel::coordinarRotacionRonda3()
         aliado->marcarLlamadoPorOtraOleada();
     }
 }
+
+// sistema de sonido
+void Nivel::cargarSonidos()
+{
+    cargarSonidosDesdeArchivos();
+}
+
+void Nivel::cargarSonidosDesdeArchivos()
+{
+    QString rutaBase = QCoreApplication::applicationDirPath();
+
+    // Buscar carpeta de assets en rutas posibles
+    QStringList posiblesRutas = {
+        rutaBase + "/../../../assets/audio",
+    };
+
+    QString rutaEncontrada;
+    for (const QString &ruta : posiblesRutas) {
+        QString rutaLimpia = QDir::cleanPath(ruta);
+        if (QDir(rutaLimpia).exists()) {
+            QDir dir(rutaLimpia);
+            QStringList archivos = dir.entryList(QDir::Files);
+            if (!archivos.isEmpty()) {
+                rutaEncontrada = rutaLimpia;
+                break;
+            }
+        }
+    }
+
+    if (rutaEncontrada.isEmpty()) {
+        return;
+    }
+
+    // Cargar sonido de ambiente de guerra
+    QString rutaAmbiente = rutaEncontrada + "/Guerra-Efectos-de-sonido.wav";
+    m_sonidoAmbiente = new QSoundEffect(this);
+
+    if (QFile::exists(rutaAmbiente)) {
+        m_sonidoAmbiente->setSource(QUrl::fromLocalFile(rutaAmbiente));
+        m_sonidoAmbiente->setVolume(0.1f);
+        m_sonidoAmbiente->setLoopCount(1);  // Solo una reproducción por vez
+
+        // Conectar señal para reproducir en loop cuando termine
+        connect(m_sonidoAmbiente, &QSoundEffect::playingChanged,
+                this, &Nivel::onSonidoAmbienteTerminado);
+
+        // Iniciar reproducción
+        m_sonidoAmbiente->play();
+
+    } else {
+        delete m_sonidoAmbiente;
+        m_sonidoAmbiente = nullptr;
+    }
+}
+
+void Nivel::onSonidoAmbienteTerminado()
+{
+    // Este slot se llama cada vez que cambia el estado de reproducción
+    if (m_sonidoAmbiente && !m_sonidoAmbiente->isPlaying()) {
+        // Si el sonido terminó de reproducirse, reproducirlo nuevamente
+        // (esto crea un loop continuo)
+        m_sonidoAmbiente->play();
+    }
+}
+
 
 OleadaCadetes* Nivel::encontrarAliadoMasCercanoEnRotacion(OleadaCadetes *petidora)
 {

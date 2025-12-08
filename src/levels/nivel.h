@@ -10,6 +10,7 @@
 #include <QPushButton>
 #include <QLabel>
 #include <QProgressBar>
+#include <QSoundEffect>
 #include <vector>
 
 #include "vector2d.h"
@@ -61,6 +62,7 @@ private slots:
     void actualizarJuego();
     void disparosEnemigos();
     void onVolverClicked();
+    void onSonidoAmbienteTerminado();
 
 private:
     // ============================
@@ -156,6 +158,11 @@ private:
     void avanzarRondaSiCompleta();
 
     void sinergiaEmboscadaRonda2();  // (probablemente la dejes de usar)
+    //sonido
+     QSoundEffect *m_sonidoAmbiente;
+
+    void cargarSonidos();
+    void cargarSonidosDesdeArchivos();
 
 
 };
