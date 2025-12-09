@@ -42,7 +42,7 @@ Nivel::Nivel(int numeroNivel, QWidget *parent, qreal _v_alto, qreal _v_ancho)
     m_moveDown(false),
     ronda_act(1),
     total_rondas(4),
-    m_sonidoAmbiente(nullptr)
+    m_sonidoAmbiente(nullptr),
     numColsChunks(10),
     numFilasChunks(0),
     chunkWidth(0.0),
