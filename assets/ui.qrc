@@ -25,5 +25,14 @@
         <file>nivel_3/arbol_hojas_3.png</file>
         <file>nivel_3/arbol_hojas_2.png</file>
         <file>nivel_3/arbol_hojas_1.png</file>
+        <file>nivel_2/obs_8.png</file>
+        <file>nivel_2/obs_7.png</file>
+        <file>nivel_2/obs_6.png</file>
+        <file>nivel_2/obs_5.png</file>
+        <file>nivel_2/obs_4.png</file>
+        <file>nivel_2/obs_3.png</file>
+        <file>nivel_2/obs_2.png</file>
+        <file>nivel_2/obs_1.png</file>
+        <file>nivel_2/barco.png</file>
     </qresource>
 </RCC>

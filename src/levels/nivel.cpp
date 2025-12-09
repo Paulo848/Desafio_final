@@ -43,7 +43,7 @@ Nivel::Nivel(int numeroNivel, QWidget *parent, qreal _v_alto, qreal _v_ancho)
     numFilasChunks(0),
     chunkWidth(0.0),
     chunkHeight(0.0),
-    debugChunks(true)
+    debugChunks(false)
 {
     // Setup UI/escena/nivel
     inicializarUI();
