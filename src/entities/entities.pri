@@ -6,6 +6,8 @@ HEADERS += \
     $$PWD/barco.h \
     $$PWD/obstaculo.h \
     $$PWD/obstaculon2.h \
+    $$PWD/avion.h \
+    $$PWD/misil.h \
     $$PWD/torpedo.h
 
 SOURCES += \
@@ -14,6 +16,8 @@ SOURCES += \
     $$PWD/barco.cpp \
     $$PWD/obstaculo.cpp \
     $$PWD/obstaculon2.cpp \
+    $$PWD/avion.cpp \
+    $$PWD/misil.cpp \
     $$PWD/torpedo.cpp
 
 INCLUDEPATH += $$PWD

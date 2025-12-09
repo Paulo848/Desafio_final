@@ -8,7 +8,7 @@ Nivel_1::Nivel_1(int numeroNivel, QWidget *parent)
     numNivel(numeroNivel),
     jugador(nullptr),
     speed(2),
-    ia(nullptr)
+    IA(new OleadaAt_Colectivo())
 {
     inicializarUI();
     inicializarEscena();
@@ -17,7 +17,7 @@ Nivel_1::Nivel_1(int numeroNivel, QWidget *parent)
     // Iniciar bucle juego
     timer = new QTimer(this);
     connect(timer, &QTimer::timeout, this, &Nivel_1::actualizarJuego);
-    timer->start(500);
+    timer->start(1500);
 }
 
 Nivel_1::~Nivel_1()
@@ -28,12 +28,9 @@ Nivel_1::~Nivel_1()
     for (auto p : participantes) {
         delete p;
     }
-    for (auto o : obstaculos) {
-        delete o;
-    }
 
     if (jugador) delete jugador;
-    if (ia) delete ia;
+    if (IA) delete IA;
 }
 
 void Nivel_1::inicializarUI()
@@ -49,17 +46,19 @@ void Nivel_1::inicializarUI()
     foto = foto.scaled(1600, 600, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
     width = foto.width();
 
-    bg1 = escena->addPixmap(foto);
+    foto1 = escena->addPixmap(foto);
     foto = foto.transformed(QTransform().scale(-1, 1));
-    bg2 = escena->addPixmap(foto);
+    foto2 = escena->addPixmap(foto);
 
-    bg1->setPos(0, 0);
-    bg2->setPos(width, 0);
+    foto1->setPos(0, 0);
+    foto2->setPos(width, 0);
 
     // Timer para actualizar
-    timer = new QTimer(this);
-    connect(timer, &QTimer::timeout, this, &Nivel_1::update);
-    timer->start(15);  //
+    timer1 = new QTimer(this);
+    connect(timer1, &QTimer::timeout, this, &Nivel_1::update);
+    timer1->start(16);
+
+    tiempodesplazarelementos = new QTimer();
 
     // Configurar vista
     vista->setScene(escena);
@@ -95,57 +94,107 @@ void Nivel_1::inicializarEscena()
         escena->setBackgroundBrush(QBrush(QColor(70, 130, 180))); // Azul acero (mar)
         break;
     }
-
-    // Agregar texto temporal
-    QGraphicsTextItem *texto = escena->addText(
-        QString("NIVEL 1 - barco").arg(numNivel)
-        );
-    texto->setDefaultTextColor(Qt::white);
-    texto->setPos(200, 20);
-    QFont font = texto->font();
-    font.setPointSize(20);
-    font.setBold(true);
-    texto->setFont(font);
 }
 
 void Nivel_1::cargarElementosNivel()
 {
     // AQUÍ irá la lógica para cargar
+    jugador = new Avion(35, 70, 170, true, 7);
+    enemigos.push_back(jugador);
+    escena -> addItem(jugador);
 }
 
 void Nivel_1::actualizarJuego()
 {
     // Bucle principal
+    // 1. Actualizar IA y Actualizar proyectiles
+    if (!HayIA){
+        int cont = 0; bool espacio; short int totalaviones; short int posy;
+        totalaviones = QRandomGenerator::global()->bounded(1, 5);
+        while (cont < totalaviones){
+            //qDebug() << cont;
+            espacio = true;
+            posy = QRandomGenerator::global()->bounded(0, 326);
+            //qDebug() << jugador->getCreados()
+            //qDebug() << jugador->getCreados() << "|" << enemigos.size();
+            for (Avion* enemy : enemigos){
+                if (enemy -> getx() == 1525){
+                    if (std::abs(posy - enemy -> gety()) < 35){
+                        espacio = false;
+                        break;
+                    }
+                }
+            }
 
-    // 1. Actualizar posiciones de participantes
-    for (auto p : participantes) {
-        // p->actualizar();
+            if (espacio){
+                Avion* enemigo = new Avion(35, 1525, posy);
+                enemigos.push_back(enemigo);
+                escena -> addItem(enemigo);
+                cont++;
+            }
+        }
+    }
+    if (((IA -> Generarnewround() && !HayIA) && (jugador -> getderribados()%5 == 0 && jugador -> getderribados() != 0)) || (HayIA && actualizarIA())){
+        generarIA();
     }
 
-    // 2. Actualizar IA
-    actualizarIA();
+    connect(tiempodesplazarelementos, &QTimer::timeout, this, &Nivel_1::DisparosEnemigosAuto);
+    tiempodesplazarelementos -> start(500);
 
-    // 3. Detectar colisiones
-    manejarColisiones();
-
-    // 4. Actualizar proyectiles
-    // ...
-
-    // 5. Verificar condiciones de victoria/derrota
-    // ...
+    // 3. Verificar condiciones de victoria/
+    if (jugador -> getVida() == 0){
+        tiempodesplazarelementos -> stop();
+        timer1 -> stop();
+        timer -> stop();
+    }
 }
 
-void Nivel_1::actualizarIA()
+bool Nivel_1::actualizarIA()
 {
-    if (ia != nullptr) {
-        // ia->Comportamiento();
+    if (IA != nullptr) {
+        for (auto it = IA -> getGrupo().begin(); it != IA -> getGrupo().end();){
+            Avion* EnemigoIA = dynamic_cast<Avion*>(*it);
+            if (!EnemigoIA -> esJugador() && EnemigoIA -> getdestruido()){
+                it = IA -> getGrupo().erase(it);
+                //delete EnemigoIA;
+            } else{
+                it++;
+            }
+        }
+        return true;
+    } else {
+        return false;
     }
 }
 
-void Nivel_1::manejarColisiones()
+void Nivel_1::manejarColisiones(Avion* emisor)
 {
     // Usar QGraphicsScene::collidingItems()
     // O implementar tu propia detección según el diagrama
+    for (auto it = enemigos.begin(); it != enemigos.end(); it++){
+        Avion* avionactual = *it;
+        if (emisor != avionactual){
+            if (!emisor -> Planes_colision(avionactual) && emisor -> esJugador() != avionactual -> esJugador()){
+                for (auto balasavionactual : avionactual -> getmunicion()){
+                    if (balasavionactual != nullptr && std::abs(emisor -> gety() - balasavionactual -> gety()) < 35){
+                        for (auto balaavion : emisor -> getmunicion()){
+                            if (std::abs(balaavion -> gety() - balasavionactual -> gety()) < 7){
+                                if (balaavion -> Colision_Balas(balasavionactual)){
+                                    break;
+                                }
+                            }
+                        }
+                        if (emisor -> Balas_colision(balasavionactual)){
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        if (avionactual -> getVida() == 0 && !avionactual -> esJugador() && !HayIA){
+            jugador -> setderribados();
+        }
+    }
 }
 
 void Nivel_1::keyPressEvent(QKeyEvent *event)
@@ -155,22 +204,30 @@ void Nivel_1::keyPressEvent(QKeyEvent *event)
     case Qt::Key_W:
     case Qt::Key_Up:
         // Mover arriba
+        jugador->setVelocidady(-jugador -> getVelocidad());
+        jugador -> Mov_vertical();
         break;
     case Qt::Key_S:
     case Qt::Key_Down:
         // Mover abajo
+        jugador->setVelocidady(jugador -> getVelocidad());
+        jugador -> Mov_vertical();
         break;
     case Qt::Key_A:
     case Qt::Key_Left:
         // Mover izquierda
+        jugador->Mov_izquierda();
         break;
     case Qt::Key_D:
     case Qt::Key_Right:
         // Mover derecha
+        jugador->Mov_derecha();
         break;
     case Qt::Key_Space:
         // Disparar
-        // if (jugador) jugador->Disparar();
+        jugador->Disparar();
+        escena -> addItem(jugador -> obtenerDisparo(jugador -> getCantMunicion()));
+        jugador -> setCantmunicion(1);
         break;
     }
 
@@ -191,17 +248,95 @@ void Nivel_1::onVolverClicked()
 
 void Nivel_1::update()
 {
-    bg1->moveBy(-speed, 0);
-    bg2->moveBy(-speed, 0);
+    foto1->moveBy(-speed, 0);
+    foto2->moveBy(-speed, 0);
 
-    // Si bg1 salió, va detrás de bg2
-    qDebug() << bg1->x() << "|" << width;
-    if (bg1->x() + width < 0){
-        bg1->setX(bg2->x() + width);
+    for (auto it = enemigos.begin(); it != enemigos.end();) {
+        Avion* e = *it;
+        if (!(e -> esJugador())) {
+            if (HayIA){
+                e -> Mov_vertical();
+            }
+            e -> Mov_izquierda();
+        }
+
+        for (auto ite = e -> getmunicion().begin(); ite != e -> getmunicion().end(); ite++){
+            Misil* misil = *ite;
+            if (misil != nullptr){
+                misil -> Desplazar(e);
+                if (misil ->getcrashed()){
+                    escena -> removeItem(misil);
+                }
+            }
+        }
+        manejarColisiones(e);
+        if (e -> getdestruido()){
+            escena->removeItem(e);
+            it = enemigos.erase(it);
+            if (!HayIA){
+                delete e;
+            }
+        } else {
+            ++it;
+        }
+    }
+    //Actualizo Municion de cada Avion en Juego.
+    for (auto AvionenJuego : enemigos){
+        AvionenJuego -> actualizarelementos();
     }
 
-    // Si bg2 salió, va detrás de bg1
-    if (bg2->x() + width < 0){
-        bg2->setX(bg1->x() + width);
+    //Reorganizacion Imagenes en el Fondo.
+    if (foto1->x() + width < 0){
+        foto1->setX(foto2->x() + width);
+    }
+    if (foto2->x() + width < 0){
+        foto2->setX(foto1->x() + width);
+    }
+}
+
+void Nivel_1::DisparosEnemigosAuto(){
+    if(!HayIA){
+        short int limit = 35;
+        for (auto it = enemigos.begin(); it != enemigos.end(); it++) {
+            Avion* avion = *it;
+            if (!avion -> esJugador()){
+                if (!avion -> getrecargar()){
+                    if (std::abs(jugador -> gety() - avion -> gety()) < limit && std::abs(jugador -> getx() - avion -> getx()) < 900){
+                        avion -> Disparar();
+                        escena -> addItem(avion -> obtenerDisparo(avion -> getCantMunicion()));
+                        avion -> setCantmunicion(1);
+                    }
+                }
+            }
+        }
+    }
+}
+
+void Nivel_1::generarIA(){
+    IA -> Generarenemigos();
+    IA -> Calcular_Desplazamiento(jugador);
+    if (!HayIA){
+        for (auto it = enemigos.begin(); it != enemigos.end();){
+            Avion* enemigo = *it;
+            if (!enemigo -> esJugador()){
+                escena -> removeItem(enemigo);
+                it = enemigos.erase(it);
+                delete enemigo;
+            } else {
+                it++;
+            }
+        }
+    }
+    HayIA = true;
+    //qDebug() << "IA generada";
+    for (auto it = IA -> getGrupo().begin(); it != IA -> getGrupo().end(); it++){
+        Avion* EnemigoIA = dynamic_cast<Avion*>(*it);
+        escena -> addItem(EnemigoIA);
+        enemigos.push_back(EnemigoIA);
+    }
+    if (IA -> rondaCompletada()){
+        HayIA = false;
+        IA -> setRondas();
+        jugador -> setderribados(-5);
     }
 }

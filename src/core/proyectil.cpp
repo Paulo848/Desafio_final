@@ -4,6 +4,8 @@
 #include <QGraphicsScene>
 #include "obstaculo.h"
 
+Proyectil::Proyectil(){}
+
 Proyectil::Proyectil(FuerzaArmada *emitidoPor,
                      const Vector2D &dir,
                      qreal vel,

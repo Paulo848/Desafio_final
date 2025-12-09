@@ -30,6 +30,7 @@ class Agente
 {
 public:
     explicit Agente(Nivel *nivelPtr);
+    Agente(short int _RondaActual = 1, short int _TotalRondas = 1);
     virtual ~Agente();
 
     // ----- Gestión de oleadas -----
@@ -45,7 +46,7 @@ public:
     virtual bool rondaCompletada() const = 0;
 
     // ----- Acceso al grupo -----
-    inline const std::vector<FuerzaArmada*>& getGrupo() const { return grupo; }
+    inline std::vector<FuerzaArmada*>& getGrupo() { return grupo; }
     inline int  getRondaActual()     const { return rondaActual; }
     inline int  getTotalRondas()     const { return totalRondas; }
 

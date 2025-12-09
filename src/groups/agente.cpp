@@ -13,6 +13,8 @@ Agente::Agente(Nivel *nivelPtr)
 {
 }
 
+Agente::Agente(short int _RondaActual, short int _TotalRondas): rondaActual(_RondaActual), totalRondas(_TotalRondas){}
+
 Agente::~Agente()
 {
     // El Nivel es quien borra las FuerzaArmada del grupo

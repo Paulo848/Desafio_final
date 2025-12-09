@@ -8,6 +8,11 @@
 #include <QKeyEvent>
 #include <QPushButton>
 #include <vector>
+#include "avion.h"
+#include "oleadaat_colectivo.h"
+#include <Qvector>
+#include <QRandomGenerator>
+#include <cstdlib>
 
 class Participantes;
 class Obstaculo;
@@ -31,6 +36,8 @@ protected:
 private slots:
     void actualizarJuego(); // El timer
     void onVolverClicked();
+    void update();
+    void DisparosEnemigosAuto();
 
 private:
     // Número del nivel
@@ -39,8 +46,8 @@ private:
     // Sistema gráfico
     QGraphicsView *vista;
     QGraphicsScene *escena;
-    QGraphicsPixmapItem *bg1;
-    QGraphicsPixmapItem *bg2;
+    QGraphicsPixmapItem *foto1;
+    QGraphicsPixmapItem *foto2;
     int width;
     int speed;
 
@@ -48,14 +55,16 @@ private:
     // Elementos del juego
     std::vector<Participantes*> participantes;
     std::vector<Obstaculo*> obstaculos;
-    std::vector<QRectF*> aviones;
-    std::vector<QPolygonF*> barcos;
-    Participantes *jugador;
-    Agente *ia;
+    Avion* jugador;
+    std::vector<Avion*> enemigos;
+    bool HayIA = false;
+    OleadaAt_Colectivo* IA;
 
     // UI
     QPushButton *btnVolver;
     QTimer* timer;
+    QTimer* timer1;
+    QTimer* tiempodesplazarelementos;
 
     // Métodos de inicialización
     void inicializarUI();
@@ -63,12 +72,11 @@ private:
     void cargarElementosNivel();
 
     // Lógica del juego
-    void manejarColisiones();
-    void actualizarIA();
-
-private slots:
-    void update();
-
+    void manejarColisiones(Avion* avion);
+    bool actualizarIA();
+    short int CantEnemigosIA = 3;
+    void generarIA();
 };
+
 
 #endif // NIVEL_1_H

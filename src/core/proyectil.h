@@ -26,6 +26,7 @@ public:
               qreal vel,
               qreal r,
               int dmg);
+    Proyectil();
 
     virtual ~Proyectil() {}
 
