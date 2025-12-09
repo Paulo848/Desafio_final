@@ -50,6 +50,7 @@ NivelIso::NivelIso(QWidget *parent)
 
     // Cargar sonidos y configurar escena inicial
     cargarSonidos();
+    cargarSpritesObstaculos();
     initScene();
 
     // Timer del game loop (aproximadamente 60 FPS)
@@ -148,12 +149,18 @@ void NivelIso::initScene()
         qreal x = 100.0 + i * 80.0;  // Lejos del barco
         qreal y = static_cast<qreal>(QRandomGenerator::global()->bounded(-100, 100));
         o.setPosition(QPointF(x, y));
+
+        // --- asignar sprite aleatorio ---
+        if (!m_spritesObstaculos.isEmpty()) {
+            int n = m_spritesObstaculos.size();
+            int id = QRandomGenerator::global()->bounded(n); // [0, n)
+            o.setSpriteId(id);
+        }
+
         m_obstaculos.append(o);
     }
 
-    // Definir área jugable en coordenadas del mundo 2D
-    // x = profundidad (obstáculos avanzan en -X)
-    // y = ancho lateral (barco se mueve en Y)
+    // Definir área jugable ...
     m_playArea = QRectF(-200.0, -150.0, 400.0, 300.0);
 }
 
@@ -216,22 +223,51 @@ void NivelIso::paintEvent(QPaintEvent *event)
     if (dibujarBarco) {
         painter.save();
         painter.translate(barcoScreen);
-        painter.setBrush(Qt::yellow);
-        painter.setPen(Qt::black);
-        painter.drawRect(-BARCO_PROFUNDIDAD/2, -BARCO_ANCHO/2, BARCO_PROFUNDIDAD, BARCO_ANCHO);
+
+        if (!m_spriteBarco.isNull()) {
+            int w = m_spriteBarco.width();
+            int h = m_spriteBarco.height();
+            // centrado en el barco
+            painter.drawPixmap(-w / 2, -h / 2, m_spriteBarco);
+        } else {
+            // Fallback: el rectángulo de antes
+            painter.setBrush(Qt::yellow);
+            painter.setPen(Qt::black);
+            painter.drawRect(-BARCO_PROFUNDIDAD/2, -BARCO_ANCHO/2,
+                             BARCO_PROFUNDIDAD, BARCO_ANCHO);
+        }
+
         painter.restore();
     }
 
     // Dibujar obstáculos
     for (const Obstaculon2 &o : m_obstaculos) {
-        QPointF oWorld = o.position();
+        QPointF oWorld  = o.position();
         QPointF oScreen = ProyeccionIso::toScreen(oWorld);
 
         painter.save();
         painter.translate(oScreen);
-        painter.setBrush(Qt::gray);
-        painter.setPen(Qt::black);
-        painter.drawRect(-OBS_PROFUNDIDAD/2, -OBS_ANCHO/2, OBS_PROFUNDIDAD, OBS_ANCHO);
+
+        if (!m_spritesObstaculos.isEmpty()) {
+            int id = o.spriteId();
+            if (id < 0 || id >= m_spritesObstaculos.size()) {
+                id = 0; // fallback seguro
+            }
+
+            const QPixmap &pix = m_spritesObstaculos[id];
+            int w = pix.width();
+            int h = pix.height();
+
+            // dibujar centrado en (0,0) usando tamaño real -> proporciones intactas
+            painter.drawPixmap(-w / 2, -h / 2, pix);
+        } else {
+            // Fallback: si no hay sprites, dibuja el rectángulo gris de antes
+            painter.setBrush(Qt::gray);
+            painter.setPen(Qt::black);
+            painter.drawRect(-OBS_PROFUNDIDAD/2, -OBS_ANCHO/2,
+                             OBS_PROFUNDIDAD, OBS_ANCHO);
+        }
+
         painter.restore();
     }
 
@@ -250,8 +286,10 @@ void NivelIso::paintEvent(QPaintEvent *event)
         }
     }
 
+    /*
     // Dibujar hitboxes de depuración (verde = no colisión, rojo = colisión)
-    drawHitbox(painter, m_barco.hitbox(), m_barco.position());
+    //drawHitbox(painter, m_barco.hitbox(), m_barco.position());
+
 
     for (const Obstaculon2 &o : m_obstaculos) {
         drawHitbox(painter, o.hitbox(), o.position());
@@ -262,6 +300,7 @@ void NivelIso::paintEvent(QPaintEvent *event)
             drawHitbox(painter, t.hitbox(), t.position());
         }
     }
+    */
 }
 
 void NivelIso::dibujarVidas(QPainter &painter)
@@ -877,7 +916,6 @@ void NivelIso::generarNuevosObstaculos()
     if (m_contadorFrames >= m_frecuenciaGeneracion) {
         m_contadorFrames = 0;
 
-        // Cantidad variable según dificultad
         int cantidadMin = qMax(1, m_cantidadObstaculos - 2);
         int cantidadMax = m_cantidadObstaculos;
         int cantidad = QRandomGenerator::global()->bounded(cantidadMin, cantidadMax + 1);
@@ -894,6 +932,14 @@ void NivelIso::generarNuevosObstaculos()
             qreal y = static_cast<qreal>(QRandomGenerator::global()->bounded(minY, maxY));
 
             o.setPosition(QPointF(x, y));
+
+            // - asignar sprite aleatorio ---
+            if (!m_spritesObstaculos.isEmpty()) {
+                int n = m_spritesObstaculos.size();
+                int id = QRandomGenerator::global()->bounded(n); // [0, n)
+                o.setSpriteId(id);
+            }
+
             m_obstaculos.append(o);
         }
     }
@@ -982,4 +1028,40 @@ void NivelIso::drawHitbox(QPainter &painter,
     painter.drawPolygon(poly);
 
     painter.restore();
+}
+
+void NivelIso::cargarSpritesObstaculos()
+{
+    m_spritesObstaculos.clear();
+
+    const qreal scaleFactorObs = 0.45;
+
+    for (int i = 1; i <= 8; ++i) {
+        QString ruta = QString(":/obs/nivel_2/obs_%1.png").arg(i);
+        QPixmap sprite(ruta);
+
+        if (!sprite.isNull()) {
+            if (scaleFactorObs != 1.0) {
+                int newW = sprite.width()  * scaleFactorObs;
+                int newH = sprite.height() * scaleFactorObs;
+                sprite = sprite.scaled(newW, newH,
+                                       Qt::KeepAspectRatio,
+                                       Qt::SmoothTransformation);
+            }
+            m_spritesObstaculos.append(sprite);
+        }
+    }
+
+    m_spriteBarco = QPixmap(":/obs/nivel_2/barco.png");
+
+    const qreal scaleFactorBarco = 0.3;
+    if (!m_spriteBarco.isNull()) {
+
+        int newW = int(m_spriteBarco.width()  * scaleFactorBarco);
+        int newH = int(m_spriteBarco.height() * scaleFactorBarco);
+
+        m_spriteBarco = m_spriteBarco.scaled(newW, newH,
+                                             Qt::KeepAspectRatio,
+                                             Qt::SmoothTransformation);
+    }
 }
