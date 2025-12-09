@@ -10,7 +10,9 @@
 #include <QPushButton>
 #include <QLabel>
 #include <QProgressBar>
+#include <QRectF>
 #include <vector>
+#include <QString>
 
 #include "vector2d.h"
 #include "fuerzaarmada.h"
@@ -19,6 +21,23 @@
 #include "obstaculo.h"
 #include "agente.h"
 #include "oleadacadetes.h"
+
+class QGraphicsRectItem;
+
+// ----------------------------------------
+//  Estructura de chunk de mapa
+// ----------------------------------------
+struct Chunk
+{
+    Vector2D indiceGrid;           // (fila, columna)
+    QRectF   area;                 // rect en coords locales del fondo
+    Vector2D centro;               // centro del chunk (local fondo)
+
+    std::vector<Obstaculo*> obstaculos;
+
+    QGraphicsRectItem* debugRect = nullptr;
+};
+
 
 class Nivel : public QWidget
 {
@@ -45,6 +64,9 @@ public:
 
     inline const std::vector<Agente*>& getAgentes() const { return agentes; }
 
+    // Acceso opcional a la grilla de chunks
+    inline const std::vector<Chunk>& getChunks() const { return chunks; }
+
 signals:
     void volverAlMenu();
 
@@ -63,6 +85,9 @@ private slots:
     void onVolverClicked();
 
 private:
+
+    bool debugChunks = true;   // por ahora true para verlos siempre
+
     // ============================
     //  Datos de estado
     // ============================
@@ -86,10 +111,10 @@ private:
 
     // Entidades
     Cadete *jugador;
-    std::vector<Cadete*> enemigos;
-    std::vector<Obstaculo*>    obstaculos;
-    std::vector<Agente*>       agentes;
-    std::vector<Proyectil*>    proyectiles;
+    std::vector<Cadete*>      enemigos;
+    std::vector<Obstaculo*>   obstaculos;
+    std::vector<Agente*>      agentes;
+    std::vector<Proyectil*>   proyectiles;
 
     // Oleadas
     int ronda_act;
@@ -110,6 +135,20 @@ private:
     QLabel       *lblRonda;
     QLabel       *lblBalas;
     QProgressBar *barraVida;
+
+    // ============================
+    //  Chunks del mapa
+    // ============================
+
+    int   numColsChunks;   // número de columnas de chunks (lo decides tú)
+    int   numFilasChunks;  // se calcula a partir del alto del fondo
+    qreal chunkWidth;      // ancho de cada chunk (en coords del fondo)
+    qreal chunkHeight;     // alto de cada chunk (en coords del fondo)
+
+    std::vector<Chunk> chunks;
+
+    // Construye la grilla de chunks usando fondoSize, numColsChunks, etc.
+    void inicializarChunks();
 
     // ============================
     //  Inicialización
@@ -144,6 +183,20 @@ private:
                                    qreal radioMin,
                                    qreal radioMax);
 
+    Obstaculo* crearObstaculoEnChunk(Chunk &chunk,
+                                     qreal refHalfSize,
+                                     qreal xRef,
+                                     qreal yRef,
+                                     int cuadrante,
+                                     const QString &spriteName);
+
+    // Patrones de obstáculos por tipo de chunk (1, 2 y 3)
+    void colocarObstaculosPatron1(Chunk &chunk);
+    void colocarObstaculosPatron2(Chunk &chunk);
+    void colocarObstaculosPatron3(Chunk &chunk);
+
+    void poblarObstaculosPatronCiclico();
+
     // ============================
     //  Helpers de oleadas
     // ============================
@@ -151,13 +204,11 @@ private:
     bool existeRonda(int r) const;
     void crearRonda1();
     void crearRonda2();
-    void crearRonda3();              // <-- NUEVA
+    void crearRonda3();
     void activarGruposRondaActual();
     void avanzarRondaSiCompleta();
 
     void sinergiaEmboscadaRonda2();  // (probablemente la dejes de usar)
-
-
 };
 
 #endif // NIVEL_H

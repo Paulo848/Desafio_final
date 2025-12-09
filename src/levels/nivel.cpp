@@ -38,7 +38,12 @@ Nivel::Nivel(int numeroNivel, QWidget *parent, qreal _v_alto, qreal _v_ancho)
     m_moveUp(false),
     m_moveDown(false),
     ronda_act(1),
-    total_rondas(4)
+    total_rondas(4),
+    numColsChunks(10),
+    numFilasChunks(0),
+    chunkWidth(0.0),
+    chunkHeight(0.0),
+    debugChunks(false)
 {
     // Setup UI/escena/nivel
     inicializarUI();
@@ -68,6 +73,9 @@ Nivel::~Nivel()
 
     // Obstáculos: son hijos de fondoScroll → los destruye la escena
     obstaculos.clear();
+
+    // Chunks: solo limpiamos el vector (no hay new dentro de Chunk)
+    chunks.clear();
 }
 
 // ============================
@@ -90,7 +98,7 @@ void Nivel::inicializarUI()
                          viewportSize.y());
 
     // Fondo del nivel
-    QPixmap imagenFondo(":/ui/ui/Fondo_Nivel_3.png");
+    QPixmap imagenFondo(":/ui/nivel_3/fondo_nivel_3.png");
     fondoSize.set(imagenFondo.width(), imagenFondo.height());
     limiteMapa = fondoSize - viewportSize;
     if (limiteMapa.x() < 0) limiteMapa.setX(0);
@@ -101,6 +109,51 @@ void Nivel::inicializarUI()
     fondoScroll->setZValue(-1000);
     actualizarPosicionFondo();
     escena->addItem(fondoScroll);
+
+    // ---------------------------------
+    //  Configuración básica de chunks
+    // ---------------------------------
+    // numColsChunks viene con un valor por defecto (p.ej. 5),
+    // pero nos aseguramos de que sea al menos 1.
+    if (numColsChunks < 1)
+        numColsChunks = 1;
+
+    // Ancho del chunk a partir del ancho del fondo
+    chunkWidth  = fondoSize.x() / static_cast<qreal>(numColsChunks);
+
+    // Por ahora queremos chunks cuadrados
+    chunkHeight = chunkWidth;
+
+    // Cantidad de filas según el alto del fondo
+    // Cantidad de filas según el alto del fondo,
+    // con regla del decimal: si la parte fraccionaria >= 0.75
+    // añadimos una fila extra.
+    if (chunkHeight > 0.0) {
+        qreal divFilas = fondoSize.y() / chunkHeight;   // p.ej. 4.2, 4.8, etc.
+        int  filasBase = static_cast<int>(divFilas);    // parte entera (floor)
+        qreal frac     = divFilas - filasBase;          // parte decimal
+
+        numFilasChunks = filasBase;
+
+        // Si el decimal es >= 0.75 → creamos la fila extra
+        if (frac >= 0.75)
+            ++numFilasChunks;
+
+        // Seguridad: si hay fondo y por redondeos quedó en 0, forzamos al menos 1 fila
+        if ((numFilasChunks < 1) && fondoSize.y() > 0.0)
+            numFilasChunks = 1;
+
+        qDebug() << "Chunks filas - div:" << divFilas
+                 << "base:" << filasBase
+                 << "frac:" << frac
+                 << "numFilasChunks:" << numFilasChunks;
+    } else {
+        numFilasChunks = 0;
+    }
+
+    inicializarChunks();
+
+    poblarObstaculosPatronCiclico();
 
     // Config vista
     vista->setScene(escena);
@@ -144,6 +197,227 @@ void Nivel::inicializarUI()
     setFocusPolicy(Qt::StrongFocus);
 }
 
+void Nivel::inicializarChunks()
+{
+    chunks.clear();
+
+    // Seguridad básica
+    if (numColsChunks <= 0 || numFilasChunks <= 0 ||
+        chunkWidth <= 0.0      || chunkHeight <= 0.0) {
+        qDebug() << "inicializarChunks(): parámetros inválidos, no se crean chunks";
+        return;
+    }
+
+    chunks.reserve(static_cast<size_t>(numColsChunks * numFilasChunks));
+
+    for (int fila = 0; fila < numFilasChunks; ++fila) {
+        for (int col = 0; col < numColsChunks; ++col) {
+
+            Chunk c;
+
+            // (columna, fila) → usamos x=col, y=fila
+            c.indiceGrid = Vector2D(col, fila);
+
+            // Origen del rectángulo del chunk en coords LOCALES del fondo
+            qreal x0 = static_cast<qreal>(col)  * chunkWidth;
+            qreal y0 = static_cast<qreal>(fila) * chunkHeight;
+
+            c.area = QRectF(x0, y0, chunkWidth, chunkHeight);
+
+            // Centro geométrico del chunk
+            c.centro = Vector2D(
+                x0 + chunkWidth  / 2.0,
+                y0 + chunkHeight / 2.0
+                );
+
+            c.obstaculos.clear();
+            c.debugRect = nullptr;
+
+            // ----- DEBUG VISUAL -----
+            if (debugChunks && fondoScroll) {
+                auto *rectItem = new QGraphicsRectItem(c.area, fondoScroll);
+                QPen pen(Qt::black);
+                pen.setWidth(1);
+                pen.setCosmetic(true); // grosor constante sin importar zoom
+                rectItem->setPen(pen);
+                rectItem->setBrush(Qt::NoBrush);
+                rectItem->setZValue(-500);   // encima del fondo, por debajo de casi todo
+                c.debugRect = rectItem;
+
+            }
+
+            chunks.push_back(c);
+        }
+    }
+
+    qDebug() << "Chunks creados:" << chunks.size()
+             << " | filas:" << numFilasChunks
+             << " columnas:" << numColsChunks;
+}
+
+Obstaculo* Nivel::crearObstaculoEnChunk(Chunk &chunk,
+                                        qreal refHalfSize,
+                                        qreal xRef,
+                                        qreal yRef,
+                                        int cuadrante,
+                                        const QString &spriteName)
+{
+    if (!fondoScroll)
+        return nullptr;
+
+    // Mitad real del chunk (puede variar en la última fila)
+    const qreal halfRealX = chunk.area.width()  / 2.0;
+    const qreal halfRealY = chunk.area.height() / 2.0;
+
+    // Escalas para pasar de sistema de referencia (refHalfSize)
+    // al tamaño real del chunk.
+    const qreal scaleX = halfRealX / refHalfSize;
+    const qreal scaleY = halfRealY / refHalfSize;
+
+    qreal dx = xRef * scaleX;
+    qreal dy = yRef * scaleY;
+
+    // Signos según cuadrante (YA ADAPTADOS, NO TOCAR)
+    qreal sx = 0.0;
+    qreal sy = 0.0;
+    switch (cuadrante) {
+    case 1:  sx = -1.0; sy =  1.0; break;
+    case 2:  sx = -1.0; sy = -1.0; break;
+    case 3:  sx =  1.0; sy = -1.0; break;
+    case 4:  sx =  1.0; sy =  1.0; break;
+    default: sx =  1.0; sy =  1.0; break;
+    }
+
+    Vector2D posLocal = chunk.centro + Vector2D(sx * dx, sy * dy);
+
+    // Ruta completa del sprite
+    const QString spritePath =
+        QStringLiteral(":obs/nivel_3/%1.png").arg(spriteName);
+
+    // Por ahora: hitbox circular genérico, solo cambia el sprite
+    Obstaculo *obs = new Obstaculo(30.0, spritePath);
+
+    obs->setParentItem(fondoScroll);
+    obs->setPos(posLocal.x(), posLocal.y());
+
+    // Registrar en el nivel y en el chunk
+    obstaculos.push_back(obs);
+    chunk.obstaculos.push_back(obs);
+
+    return obs;
+}
+
+void Nivel::colocarObstaculosPatron1(Chunk &chunk)
+{
+    const qreal refHalfSize = 9.0; // el "9" de |1-9
+
+    // Bloque I
+    crearObstaculoEnChunk(chunk, refHalfSize, 1.5, 4.5, 1, "Piedra_2");
+    crearObstaculoEnChunk(chunk, refHalfSize, 0.0, 1.0, 1, "circulo_4");
+    crearObstaculoEnChunk(chunk, refHalfSize, 0.0, 1.5, 1, "arbol_hojas_2");
+    crearObstaculoEnChunk(chunk, refHalfSize, 4.5, 1.0, 1, "arbol_hojas_3");
+
+    // Bloque II
+    crearObstaculoEnChunk(chunk, refHalfSize, 5.0, 8.0, 2, "Piedra_3");
+    crearObstaculoEnChunk(chunk, refHalfSize, 8.0, 6.0, 2, "arbol_tronco_3");
+    crearObstaculoEnChunk(chunk, refHalfSize, 7.5, 4.0, 2, "caja_1_1");
+    crearObstaculoEnChunk(chunk, refHalfSize, 5.0, 3.5, 2, "caja_3_1");
+
+    // Bloque III
+    crearObstaculoEnChunk(chunk, refHalfSize, 3.0, 8.5, 3, "Piedra_1");
+    crearObstaculoEnChunk(chunk, refHalfSize, 4.5, 3.5, 3, "circulo_3");
+    crearObstaculoEnChunk(chunk, refHalfSize, 4.5, 5.0, 3, "arbol_hojas_1");
+    crearObstaculoEnChunk(chunk, refHalfSize, 0.5, 4.5, 3, "caja_3");
+    crearObstaculoEnChunk(chunk, refHalfSize, 5.5, 6.0, 3, "circulo_1");
+    crearObstaculoEnChunk(chunk, refHalfSize, 2.0, 6.0, 3, "circulo_2");
+}
+
+void Nivel::colocarObstaculosPatron2(Chunk &chunk)
+{
+    const qreal refHalfSize = 10.5; // el "10.5" de |2-10.5
+
+    // Primer bloque
+    crearObstaculoEnChunk(chunk, refHalfSize, 4.0,  9.0, 2, "arbol_hojas_1");
+    crearObstaculoEnChunk(chunk, refHalfSize, 6.0,  7.0, 2, "caja_3_1");
+    crearObstaculoEnChunk(chunk, refHalfSize, 2.5,  3.0, 2, "caja_1");
+    crearObstaculoEnChunk(chunk, refHalfSize, 1.0,  7.0, 1, "caja_3");
+    crearObstaculoEnChunk(chunk, refHalfSize, 3.5,  6.0, 1, "circulo_4");
+
+    // Segundo bloque
+    crearObstaculoEnChunk(chunk, refHalfSize, 9.2,  0.0, 2, "Piedra_1");
+    crearObstaculoEnChunk(chunk, refHalfSize, 6.2,  3.0, 3, "Piedra_2");
+
+    // Tercer bloque
+    crearObstaculoEnChunk(chunk, refHalfSize, 3.5,  4.0, 4, "Piedra_3");
+    crearObstaculoEnChunk(chunk, refHalfSize, 2.0,  4.0, 4, "caja_2");
+    crearObstaculoEnChunk(chunk, refHalfSize, 1.5,  6.0, 4, "caja_1_2");
+}
+
+void Nivel::colocarObstaculosPatron3(Chunk &chunk)
+{
+    const qreal refHalfSize = 8.5; // el "8.5" de |3-8.5
+
+    // Primer bloque
+    crearObstaculoEnChunk(chunk, refHalfSize, 2.5, 7.0, 2, "Piedra_1");
+    crearObstaculoEnChunk(chunk, refHalfSize, 2.5, 5.0, 2, "circulo_4");
+    crearObstaculoEnChunk(chunk, refHalfSize, 1.0, 5.0, 2, "caja_3_2");
+    crearObstaculoEnChunk(chunk, refHalfSize, 2.0, 6.5, 1, "arma");
+
+    // Segundo bloque
+    crearObstaculoEnChunk(chunk, refHalfSize, 6.5, 1.5, 2, "Piedra_3");
+    crearObstaculoEnChunk(chunk, refHalfSize, 8.5, 1.0, 2, "caja_1");
+
+    // Tercer bloque
+    crearObstaculoEnChunk(chunk, refHalfSize, 1.0, 1.0, 3, "circulo_1");
+    crearObstaculoEnChunk(chunk, refHalfSize, 2.0, 2.0, 3, "caja_1_2");
+    crearObstaculoEnChunk(chunk, refHalfSize, 0.5, 1.5, 2, "arbol_hojas_4");
+    crearObstaculoEnChunk(chunk, refHalfSize, 2.0, 3.0, 3, "Piedra_2");
+}
+
+void Nivel::poblarObstaculosPatronCiclico()
+{
+    if (chunks.empty())
+        return;
+
+    // Recorremos fila por fila
+    for (int fila = 0; fila < numFilasChunks; ++fila) {
+
+        // Tipo inicial de esta fila:
+        // fila 0 -> 1
+        // fila 1 -> 2
+        // fila 2 -> 3
+        // fila 3 -> 1
+        int tipo = (fila % 3) + 1;
+
+        for (int col = 0; col < numColsChunks; ++col) {
+
+            const int idx = fila * numColsChunks + col;
+            if (idx < 0 || idx >= static_cast<int>(chunks.size()))
+                continue;   // seguridad
+
+            Chunk &c = chunks[idx];
+
+            switch (tipo) {
+            case 1:
+                colocarObstaculosPatron1(c);
+                break;
+            case 2:
+                colocarObstaculosPatron2(c);
+                break;
+            case 3:
+            default:
+                colocarObstaculosPatron3(c);
+                break;
+            }
+
+            // Avanzar tipo 1 -> 2 -> 3 -> 1 -> ...
+            ++tipo;
+            if (tipo > 3)
+                tipo = 1;
+        }
+    }
+}
+
 void Nivel::inicializarEscena()
 {
     // Color de fondo por nivel
@@ -169,9 +443,6 @@ void Nivel::cargarElementosNivel()
     connect(timerDisparoEnemigos, &QTimer::timeout, this, &Nivel::disparosEnemigos);
     timerDisparoEnemigos->start(500);
 
-    // Obstáculos
-    //crearObstaculosFijos();
-    crearObstaculosAleatorios(/*num*/14, /*rmin*/80.0, /*rmax*/400.0);
 }
 
 // ============================
@@ -244,6 +515,14 @@ void Nivel::actualizarPosicionFondo()
     // Reposicionar fondo por cámara
     Vector2D origenFondo = (viewportSize / -2.0) - camara;
     fondoScroll->setPos(origenFondo.x(), origenFondo.y());
+}
+
+void Nivel::actualizarIA()
+{
+    //Actualizar agentes activos
+    for(auto *a : agentes)
+        if(a && a->estaActivo())
+            a->actualizar();
 }
 
 void Nivel::actualizarOleadas()
@@ -463,7 +742,6 @@ bool Nivel::jugadorTocaObstaculo() const
 
 
 void Nivel::manejarColisiones() {}
-void Nivel::actualizarIA() {}
 void Nivel::onVolverClicked()
 {
     // Volver al menú
@@ -503,35 +781,6 @@ void Nivel::crearObstaculosFijos()
     pared->setParentItem(fondoScroll);
     pared->setPos(fondoCentro.x() / 2.0 + 250, fondoCentro.y() + 150);
     obstaculos.push_back(pared);
-}
-
-void Nivel::crearObstaculosAleatorios(int numExtraObst, qreal radioMin, qreal radioMax)
-{
-    // Centro del fondo
-    auto fondoCentro = Vector2D(fondoSize.x() / 2.0, fondoSize.y() / 2.0);
-
-    // Aleatorios
-    for (int i = 0; i < numExtraObst; ++i) {
-        qreal ang = QRandomGenerator::global()->generateDouble() * 2.0 * M_PI;
-        qreal r   = radioMin + (radioMax - radioMin) * QRandomGenerator::global()->generateDouble();
-        Vector2D offset = Vector2D::desdePolar(r, ang);
-
-        bool esCircular = (QRandomGenerator::global()->bounded(2) == 0);
-        Obstaculo *obs = nullptr;
-
-        if (esCircular) {
-            qreal rad = 15.0 + QRandomGenerator::global()->generateDouble() * 20.0;
-            obs = new Obstaculo(rad);
-        } else {
-            qreal w = 40.0 + QRandomGenerator::global()->generateDouble() * 60.0;
-            qreal h = 20.0 + QRandomGenerator::global()->generateDouble() * 40.0;
-            obs = new Obstaculo(w, h);
-        }
-
-        obs->setParentItem(fondoScroll);
-        obs->setPos(fondoCentro.x() + offset.x(), fondoCentro.y() + offset.y());
-        obstaculos.push_back(obs);
-    }
 }
 
 bool Nivel::existeRonda(int r) const

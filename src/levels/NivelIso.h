@@ -6,6 +6,7 @@
 #include <QPointF>
 #include <QSoundEffect>
 #include <QTimer>
+#include <QPixmap>
 #include "barco.h"
 #include "obstaculon2.h"
 #include "torpedo.h"
@@ -59,6 +60,8 @@ private:
     void cargarSonidos();
     void cargarSonidosDesdeArchivos();
 
+    void cargarSpritesObstaculos();
+
     Barco m_barco;
     QVector<Obstaculon2> m_obstaculos;
     QVector<Torpedo> m_torpedos;
@@ -100,6 +103,10 @@ private:
 
     QSoundEffect *m_sonidoDisparo;
     QSoundEffect *m_sonidoExplosion;
+
+    QVector<QPixmap> m_spritesObstaculos;
+
+    QPixmap m_spriteBarco;
 };
 
 #endif // NIVELISO_H

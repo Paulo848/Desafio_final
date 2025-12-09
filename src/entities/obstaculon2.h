@@ -15,9 +15,14 @@ public:
     Hitbox &hitbox();
     const Hitbox &hitbox() const;
 
+    void setSpriteId(int id);
+    int spriteId() const;
+
 private:
     QPointF m_position;
     Hitbox m_hitbox;
+
+    int m_spriteId;
 };
 
 #endif // OBSTACULON2_H

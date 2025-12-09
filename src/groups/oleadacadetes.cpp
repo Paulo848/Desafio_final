@@ -83,6 +83,8 @@ void OleadaCadetes::spawnRonda(int cantidad,
 
         grupo.push_back(e);
         nivel->registrarEnemigo(e);  // el Nivel también los conoce
+        qDebug() << "Spawn enemigo en scene:" << e->scenePos();
+
     }
 
     // Según el modo, ajustamos estados iniciales
