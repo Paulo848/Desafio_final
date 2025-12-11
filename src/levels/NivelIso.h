@@ -107,6 +107,7 @@ private:
     QVector<QPixmap> m_spritesObstaculos;
 
     QPixmap m_spriteBarco;
+    QPixmap m_spriteTorpedo;
 };
 
 #endif // NIVELISO_H
