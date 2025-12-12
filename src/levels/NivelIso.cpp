@@ -1080,10 +1080,10 @@ void NivelIso::cargarSpritesObstaculos()
                                              Qt::KeepAspectRatio,
                                              Qt::SmoothTransformation);
     }
-
+    // Sprite torpedo
     m_spriteTorpedo = QPixmap(":/obs/nivel_2/torpedo.png");
 
-    const qreal scaleFactorTorpedo = 0.07;  // Ajusta según necesites
+    const qreal scaleFactorTorpedo = 0.07;
     if (!m_spriteTorpedo.isNull()) {
         int newW = int(m_spriteTorpedo.width()  * scaleFactorTorpedo);
         int newH = int(m_spriteTorpedo.height() * scaleFactorTorpedo);
