@@ -21,7 +21,8 @@
 #include "bala.h"
 #include "obstaculo.h"
 #include "agente.h"
-#include "oleadacadetes.h"
+
+class OleadaCadetes;
 
 class QGraphicsRectItem;
 
@@ -70,6 +71,7 @@ public:
 
 signals:
     void volverAlMenu();
+    void reintentarNivel(int numNivel);
 
 protected:
     // --- Entradas ---
@@ -78,17 +80,27 @@ protected:
     void mouseMoveEvent(QMouseEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
     bool eventFilter(QObject *obj, QEvent *event) override;
+    void resizeEvent(QResizeEvent *event) override;
 
 private slots:
     // --- Loop y acciones de UI ---
     void actualizarJuego();
-    void disparosEnemigos();
     void onVolverClicked();
     void onSonidoAmbienteTerminado();
 
 private:
 
-    bool debugChunks = true;   // por ahora true para verlos siempre
+    bool debugChunks = false;
+    void actualizarDebugChunksVisibles();
+
+    // --- Debug de zoom ---
+    qreal zoomDefault = 2.0;   // 2.0 = default
+    qreal zoomActual = 2.0;   // 2.0 = tamaño normal
+    qreal zoomMin    = 0.1;   // hasta dónde puedes alejar
+    qreal zoomMax    = 2.5;   // hasta dónde puedes acercar
+    qreal zoomStep   = 1.10;  // factor por tecla (15% aprox cada vez)
+
+    void aplicarZoomVista();
 
     // ============================
     //  Datos de estado
@@ -137,6 +149,33 @@ private:
     QLabel       *lblRonda;
     QLabel       *lblBalas;
     QProgressBar *barraVida;
+
+    // --- Recarga del jugador ---
+    QProgressBar *barraRecarga = nullptr;
+    bool          recargandoJugador = false;
+    int           recargaTicksActual = 0;
+    int           recargaTicksTotal  = 60; // ~1s si el timer es de 16ms
+
+    // --- Game Over / End Game ---
+    bool          juegoTerminado      = false;
+    QWidget      *overlayGameOver     = nullptr;
+    QLabel       *lblGameOverTitulo   = nullptr;
+    QLabel       *lblGameOverStats    = nullptr;
+    QPushButton  *btnReintentar       = nullptr;
+    QPushButton  *btnMenuGameOver     = nullptr;
+
+    void finJuegoPorMuerte();
+    void finJuegoPorVictoria();
+    void mostrarGameOverOverlay(bool victoria = false);
+    void destruirOverlayGameOver();
+
+
+    // ============================
+    //  Recarga jugador
+    // ============================
+    void iniciarRecargaJugador();
+    void cancelarRecargaJugador();
+    void actualizarRecargaJugador();
 
     // ============================
     //  Chunks del mapa

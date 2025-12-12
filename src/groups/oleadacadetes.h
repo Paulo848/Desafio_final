@@ -91,8 +91,14 @@ private:
     bool pidiendoRefuerzo         = false;   // esta oleada pide relevo
     bool llamadoPorOtraOleada     = false;   // esta oleada fue llamada para atacar
 
-    // --- Munición agregada del grupo ---
-    int municionGrupoActual = 0;             // suma de munición de todos los cadetes
+    // --- Cuantos cadetes del grupo tienen balas ---
+
+    int municionGrupoActual = 0;
+    // Cooldown compartido para los disparos de este grupo
+    int ticksDesdeUltDisparo;
+
+    // Cada cuántos "ticks" del juego se permite una ráfaga del grupo
+    static const int COOLDOWN_DISPARO_TICKS;
 
     // ============================
     //  Orquestador por modo
@@ -119,6 +125,9 @@ private:
 
     // Recalcula munición total del grupo (llamando a Cadete::tieneMunicion)
     void actualizarMunicionGrupo();
+
+    // Decide si se disparan balas en este frame
+    void actualizarDisparos();
 
     // ============================
     //  Helpers de movimiento / steering

@@ -48,6 +48,11 @@ public:
     // Intenta consumir una bala. Devuelve true si pudo disparar.
     bool consumirBala();
 
+    // Getters usados por el HUD (Nivel)
+    int getBalas() const;
+    int getBalasMax() const;
+
+
 };
 
 #endif // CADETE_H

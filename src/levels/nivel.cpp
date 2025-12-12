@@ -2,6 +2,7 @@
 #include "cadete.h"
 #include "fuerzaarmada.h"
 #include "obstaculo.h"
+#include "constantes_juego.h"
 
 #include <QVBoxLayout>
 #include <QGraphicsRectItem>
@@ -15,9 +16,12 @@
 #include <QCoreApplication>
 #include <QFile>
 #include <algorithm>
+#include <QHBoxLayout>
+#include <QFrame>
 
 #include "bala.h"
 #include "oleadacadetes.h"
+#include <limits>
 
 // ============================
 // 1) Constructor / Destructor
@@ -34,6 +38,7 @@ Nivel::Nivel(int numeroNivel, QWidget *parent, qreal _v_alto, qreal _v_ancho)
     escena(nullptr),
     fondoScroll(nullptr),
     timer(nullptr),
+    timerDisparoEnemigos(nullptr),
     jugador(nullptr),
     mouseDir(0.0, 0.0),
     m_moveLeft(false),
@@ -41,13 +46,12 @@ Nivel::Nivel(int numeroNivel, QWidget *parent, qreal _v_alto, qreal _v_ancho)
     m_moveUp(false),
     m_moveDown(false),
     ronda_act(1),
-    total_rondas(4),
+    total_rondas(3),
     m_sonidoAmbiente(nullptr),
-    numColsChunks(10),
+    numColsChunks(5),
     numFilasChunks(0),
     chunkWidth(0.0),
-    chunkHeight(0.0),
-    debugChunks(false)
+    chunkHeight(0.0)
 {
     // Setup UI/escena/nivel
     inicializarUI();
@@ -57,7 +61,8 @@ Nivel::Nivel(int numeroNivel, QWidget *parent, qreal _v_alto, qreal _v_ancho)
     // Cargar sonidos
     cargarSonidos();
 
-    cargarElementosNivel();
+    //Aplicar Zoom por defecto
+    aplicarZoomVista();
 
     // Timer principal
     timer = new QTimer(this);
@@ -92,6 +97,9 @@ Nivel::~Nivel()
 
     // Chunks: solo limpiamos el vector (no hay new dentro de Chunk)
     chunks.clear();
+
+    destruirOverlayGameOver();
+
 }
 
 // ============================
@@ -106,6 +114,7 @@ void Nivel::inicializarUI()
 
     vista  = new QGraphicsView(this);
     escena = new QGraphicsScene(this);
+    vista->setTransformationAnchor(QGraphicsView::AnchorViewCenter);
 
     // Rectángulo de escena
     escena->setSceneRect(-viewportSize.x()/2.0,
@@ -181,30 +190,135 @@ void Nivel::inicializarUI()
     vista->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     this->setMouseTracking(true);
 
-    // HUD simple
+    // HUD bonito
     hud = new QWidget(this);
+    hud->setObjectName("hudRoot");
     hud->setAttribute(Qt::WA_TransparentForMouseEvents);
-    hud->setStyleSheet("background: transparent;");
     hud->setGeometry(0, 0, viewportSize.x(), viewportSize.y());
 
-    barraVida = new QProgressBar(hud);
-    barraVida->setGeometry(20, 20, 200, 25);
-    barraVida->setRange(0, 100);
+    hud->setStyleSheet(
+        "QWidget#hudRoot {"
+        "   background: transparent;"
+        "}"
+        "QFrame#hudPanel {"
+        "   background-color: rgba(5, 5, 10, 190);"
+        "   border-radius: 12px;"
+        "}"
+        "QLabel {"
+        "   color: #f0f0f0;"
+        "}"
+        "QProgressBar {"
+        "   background-color: rgba(255, 255, 255, 40);"
+        "   border-radius: 8px;"
+        "   border: 1px solid rgba(0, 0, 0, 160);"
+        "   text-align: center;"
+        "   font-size: 11px;"
+        "   font-weight: 600;"
+        "   color: #f0f0f0;"
+        "}"
+        "QProgressBar::chunk {"
+        "   background-color: #2ecc71;"
+        "   border-radius: 8px;"
+        "}"
+        );
+
+    // Panel superior (lo posicionamos a mano)
+    QFrame *panelSuperior = new QFrame(hud);
+    panelSuperior->setObjectName("hudPanel");
+
+    auto *panelLayout = new QHBoxLayout(panelSuperior);
+    panelLayout->setContentsMargins(12, 8, 12, 8);
+    panelLayout->setSpacing(24);
+
+    // --- Columna VIDA ---
+    auto *colVida = new QVBoxLayout();
+    QLabel *lblVidaTitulo = new QLabel("VIDA", panelSuperior);
+    lblVidaTitulo->setStyleSheet("font-size: 11px; font-weight: 600; color: #c0c0c0;");
+    barraVida = new QProgressBar(panelSuperior);
+    barraVida->setMinimum(0);
+    barraVida->setMaximum(100);
     barraVida->setValue(100);
+    barraVida->setFixedWidth(180);
+    colVida->addWidget(lblVidaTitulo);
+    colVida->addWidget(barraVida);
+    panelLayout->addLayout(colVida);
 
-    lblEnemigos = new QLabel("0 / 0", hud);
-    lblEnemigos->setGeometry(20, 60, 150, 20);
+    // --- Columna RONDA ---
+    auto *colRonda = new QVBoxLayout();
+    QLabel *lblRondaTitulo = new QLabel("RONDA", panelSuperior);
+    lblRondaTitulo->setStyleSheet("font-size: 11px; font-weight: 600; color: #c0c0c0;");
+    lblRonda = new QLabel("1 / 3", panelSuperior);
+    lblRonda->setStyleSheet("font-size: 14px; font-weight: 700;");
+    colRonda->addWidget(lblRondaTitulo);
+    colRonda->addWidget(lblRonda);
+    panelLayout->addLayout(colRonda);
 
-    lblRonda = new QLabel("1 / 5", hud);
-    lblRonda->setGeometry(20, 90, 150, 20);
+    // --- Columna ENEMIGOS ---
+    auto *colEnemigos = new QVBoxLayout();
+    QLabel *lblEnemigosTitulo = new QLabel("ENEMIGOS", panelSuperior);
+    lblEnemigosTitulo->setStyleSheet("font-size: 11px; font-weight: 600; color: #c0c0c0;");
+    lblEnemigos = new QLabel("-- / --", panelSuperior);
+    lblEnemigos->setStyleSheet("font-size: 14px; font-weight: 700;");
+    colEnemigos->addWidget(lblEnemigosTitulo);
+    colEnemigos->addWidget(lblEnemigos);
+    panelLayout->addLayout(colEnemigos);
 
-    lblBalas = new QLabel("0 / 30", hud);
-    lblBalas->setGeometry(20, 120, 150, 20);
+    // --- Columna MUNICIÓN ---
+    auto *colBalas = new QVBoxLayout();
+    QLabel *lblBalasTitulo = new QLabel("MUNICIÓN", panelSuperior);
+    lblBalasTitulo->setStyleSheet("font-size: 11px; font-weight: 600; color: #c0c0c0;");
+    lblBalas = new QLabel("-- / --", panelSuperior);
+    lblBalas->setStyleSheet("font-size: 14px; font-weight: 700;");
+    colBalas->addWidget(lblBalasTitulo);
+    colBalas->addWidget(lblBalas);
+    panelLayout->addLayout(colBalas);
 
-    // Botón volver
+    //hudRootLayout->addWidget(panelSuperior, 0, Qt::AlignTop | Qt::AlignLeft);
+    //hudRootLayout->addStretch();
+
+    //hudRootLayout->addWidget(panelSuperior, 0, Qt::AlignTop | Qt::AlignLeft);
+    //hudRootLayout->addStretch();
+
+    // ------------------------------
+    // Barra de recarga (centro abajo)
+    // ------------------------------
+    barraRecarga = new QProgressBar(hud);
+    barraRecarga->setRange(0, recargaTicksTotal);
+    barraRecarga->setValue(0);
+    barraRecarga->setVisible(false);
+    barraRecarga->setTextVisible(true);
+    barraRecarga->setFormat("Recargando... %p%");
+
+    int anchoRecarga = 220;
+    int altoRecarga  = 18;
+    int xRecarga = static_cast<int>((viewportSize.x() - anchoRecarga) / 2.0);
+    int yRecarga = static_cast<int>(viewportSize.y() - 70);
+
+    barraRecarga->setGeometry(xRecarga, yRecarga, anchoRecarga, altoRecarga);
+
+    // Botón volver (manteniendo posición en esquina inferior izquierda)
     btnVolver = new QPushButton("Volver al Menú", this);
     btnVolver->setGeometry(20, viewportSize.y() - 50, 150, 30);
+    btnVolver->setStyleSheet(
+        "QPushButton {"
+        "   background-color: rgba(5, 5, 10, 190);"
+        "   color: #f0f0f0;"
+        "   border-radius: 8px;"
+        "   padding: 6px 12px;"
+        "}"
+        "QPushButton:hover {"
+        "   background-color: rgba(40, 40, 60, 220);"
+        "}"
+        "QPushButton:pressed {"
+        "   background-color: rgba(20, 20, 35, 240);"
+        "}"
+        );
     connect(btnVolver, &QPushButton::clicked, this, &Nivel::onVolverClicked);
+
+    // Ajustar tamaño del panel según su contenido
+    panelSuperior->adjustSize();
+    // Moverlo a la esquina superior izquierda con un margen
+    panelSuperior->move(16, 16);
 
     // Final UI
     vista->centerOn(0,0);
@@ -250,7 +364,7 @@ void Nivel::inicializarChunks()
             c.debugRect = nullptr;
 
             // ----- DEBUG VISUAL -----
-            if (debugChunks && fondoScroll) {
+            if (fondoScroll) {
                 auto *rectItem = new QGraphicsRectItem(c.area, fondoScroll);
                 QPen pen(Qt::black);
                 pen.setWidth(1);
@@ -258,8 +372,11 @@ void Nivel::inicializarChunks()
                 rectItem->setPen(pen);
                 rectItem->setBrush(Qt::NoBrush);
                 rectItem->setZValue(-500);   // encima del fondo, por debajo de casi todo
-                c.debugRect = rectItem;
 
+                // visible sólo si el flag está activo
+                rectItem->setVisible(debugChunks);
+
+                c.debugRect = rectItem;
             }
 
             chunks.push_back(c);
@@ -451,13 +568,14 @@ void Nivel::cargarElementosNivel()
     jugador->setPos(0, 0);
     escena->addItem(jugador);
 
+    // Munición inicial del jugador
+    jugador->definirMunicion(30, 30);
+
+    // velocidad del jugador usando la constante
+    jugador->setVelocidad(VELOCIDAD_JUGADOR);
+
     // Oleadas iniciales
     actualizarOleadas();
-
-    // Timer disparos enemigos
-    timerDisparoEnemigos = new QTimer(this);
-    connect(timerDisparoEnemigos, &QTimer::timeout, this, &Nivel::disparosEnemigos);
-    timerDisparoEnemigos->start(500);
 
 }
 
@@ -467,6 +585,9 @@ void Nivel::cargarElementosNivel()
 
 void Nivel::actualizarJuego()
 {
+    if (juegoTerminado)
+        return;
+
     // Mover cámara
     if (m_moveLeft || m_moveRight || m_moveUp || m_moveDown)
         actualizarFondo();
@@ -482,9 +603,17 @@ void Nivel::actualizarJuego()
     // Enemigos muertos
     desactivarEnemigosMuertos();
 
+    // Recarga jugador
+    actualizarRecargaJugador();
+
     // HUD / colisiones
     actualizarHUD();
     manejarColisiones();
+
+    // --- Game Over por muerte del jugador ---
+    if (jugador && jugador->estaMuerto()) {
+        finJuegoPorMuerte();
+    }
 }
 
 // --- Subrutinas del loop ---
@@ -621,21 +750,75 @@ void Nivel::desactivarEnemigosMuertos()
 
 void Nivel::actualizarHUD()
 {
-    // Vida
-    barraVida->setValue(jugador ? jugador->getVida() : 0);
+    // -------- VIDA --------
+    static int vidaMaxima = -1;
 
-    // Enemigos (placeholder)
-    lblEnemigos->setText(QString("%1 / %2")
-                             .arg("")  // get enemigos matados
-                             .arg("")); // get enemigos totales
+    if (!jugador) {
+        barraVida->setRange(0, 1);
+        barraVida->setValue(0);
+        barraVida->setFormat("Muerto");
+    } else {
+        int vidaActual = jugador->getVida();
 
-    // Ronda
-    lblRonda->setText(QString("%1 / %2").arg(ronda_act).arg(total_rondas));
+        if (vidaMaxima < 0) {
+            vidaMaxima = (vidaActual > 0) ? vidaActual : 1;
+            barraVida->setRange(0, vidaMaxima);
+        }
 
-    // Balas (placeholder)
-    lblBalas->setText(QString("%1 / %2")
-                          .arg("")   // jugador->getBalas()
-                          .arg("")); // jugador->getBalasMax()
+        int valor = vidaActual;
+        if (valor < 0) valor = 0;
+        if (valor > vidaMaxima) valor = vidaMaxima;
+
+        barraVida->setValue(valor);
+        barraVida->setFormat(
+            QString("%1 / %2 HP").arg(vidaActual).arg(vidaMaxima)
+            );
+    }
+
+    // -------- ENEMIGOS (muertos / totales) --------
+    int totalEnemigos   = 0;
+    int enemigosMuertos = 0;
+
+    for (FuerzaArmada *e : enemigos) {
+        if (!e) continue;
+        ++totalEnemigos;
+        if (e->estaMuerto())
+            ++enemigosMuertos;
+    }
+
+    if (totalEnemigos == 0) {
+        lblEnemigos->setText("-- / --");
+    } else {
+        lblEnemigos->setText(
+            QString("%1 / %2")
+                .arg(enemigosMuertos)
+                .arg(totalEnemigos)
+            );
+    }
+
+    // -------- RONDAS (máx 3) --------
+    if (ronda_act <= total_rondas) {
+        lblRonda->setText(
+            QString("%1 / %2")
+                .arg(ronda_act)
+                .arg(total_rondas)
+            );
+    } else {
+        // Ya no hay más rondas definidas
+        lblRonda->setText("Completado");
+    }
+
+    // -------- MUNICIÓN --------
+    if (jugador) {
+        // Asumiendo que Cadete tiene estos getters (ya los habías dejado en el comentario)
+        lblBalas->setText(
+            QString("%1 / %2")
+                .arg(jugador->getBalas())
+                .arg(jugador->getBalasMax())
+            );
+    } else {
+        lblBalas->setText("-- / --");
+    }
 }
 
 // ============================
@@ -661,9 +844,17 @@ void Nivel::mouseMoveEvent(QMouseEvent *event)
 
 void Nivel::mousePressEvent(QMouseEvent *event)
 {
-    // Disparo con click izquierdo
-    if (event->button() == Qt::LeftButton)
+    if (event->button() == Qt::LeftButton) {
+
+        // Si está recargando, el click cancela la recarga y NO dispara
+        if (recargandoJugador) {
+            cancelarRecargaJugador();
+            return;
+        }
+
+        // Si no está recargando: disparo normal
         disparar(jugador);
+    }
 }
 
 bool Nivel::eventFilter(QObject *obj, QEvent *event)
@@ -682,21 +873,6 @@ bool Nivel::eventFilter(QObject *obj, QEvent *event)
     return QWidget::eventFilter(obj, event);
 }
 
-void Nivel::keyPressEvent(QKeyEvent *event)
-{
-    // Flags de movimiento
-    switch (event->key()) {
-    case Qt::Key_A:
-    case Qt::Key_Left:  m_moveLeft  = true; break;
-    case Qt::Key_D:
-    case Qt::Key_Right: m_moveRight = true; break;
-    case Qt::Key_W:
-    case Qt::Key_Up:    m_moveUp    = true; break;
-    case Qt::Key_S:
-    case Qt::Key_Down:  m_moveDown  = true; break;
-    }
-}
-
 void Nivel::keyReleaseEvent(QKeyEvent *event)
 {
     // Soltar flags
@@ -712,24 +888,77 @@ void Nivel::keyReleaseEvent(QKeyEvent *event)
     }
 }
 
+void Nivel::keyPressEvent(QKeyEvent *event)
+{
+    switch (event->key()) {
+    case Qt::Key_A:
+    case Qt::Key_Left:  m_moveLeft  = true; break;
+    case Qt::Key_D:
+    case Qt::Key_Right: m_moveRight = true; break;
+    case Qt::Key_W:
+    case Qt::Key_Up:    m_moveUp    = true; break;
+    case Qt::Key_S:
+    case Qt::Key_Down:  m_moveDown  = true; break;
+
+    case Qt::Key_R:
+        iniciarRecargaJugador();
+        break;
+
+    // Mostrar / ocultar grilla de chunks
+    case Qt::Key_F3:
+        debugChunks = !debugChunks;
+        actualizarDebugChunksVisibles();
+        break;
+
+    // Reset del zoom al valor por defecto
+    case Qt::Key_F6:
+        zoomActual = zoomDefault;
+        aplicarZoomVista();
+        break;
+
+    // Zoom out (alejar)
+    case Qt::Key_F7: {
+        qreal nuevo = zoomActual / zoomStep;
+        if (nuevo < zoomMin) nuevo = zoomMin;
+
+        if (!qFuzzyCompare(nuevo, zoomActual)) {
+            zoomActual = nuevo;
+            aplicarZoomVista();
+        } else {
+            qDebug() << "[ZOOM] min alcanzado:" << zoomActual << "x";
+        }
+        break;
+    }
+
+    // Zoom in (acercar)
+    case Qt::Key_F8: {
+        qreal nuevo = zoomActual * zoomStep;
+        if (nuevo > zoomMax) nuevo = zoomMax;
+
+        if (!qFuzzyCompare(nuevo, zoomActual)) {
+            zoomActual = nuevo;
+            aplicarZoomVista();
+        } else {
+            qDebug() << "[ZOOM] max alcanzado:" << zoomActual << "x";
+        }
+        break;
+    }
+    }
+}
+
 // ============================
 // 5) Acciones de juego sueltas
 // ============================
-
-void Nivel::disparosEnemigos()
-{
-    for (auto *e : enemigos) {
-
-        if (!e || e->estaMuerto() || !e->estaDisparando() || !e->tieneMunicion() )
-            continue;
-        disparar(e);
-    }
-}
 
 void Nivel::disparar(Cadete *emisor)
 {
     if (!emisor) return;
     if (!emisor->esJugador() && emisor->estaMuerto()) return;
+
+    // Consumir bala antes de crear el proyectil.
+    // Si no tenía munición, no se dispara nada.
+    if (!emisor->consumirBala())
+        return;
 
     // Pos en fondo
     QPointF posEnFondo = fondoScroll->mapFromScene(emisor->scenePos());
@@ -1011,20 +1240,27 @@ void Nivel::activarGruposRondaActual()
 void Nivel::avanzarRondaSiCompleta()
 {
     // Contar terminados
-    int gruposEnRonda = 0;
-    int gruposTerminados = 0;
+    int gruposEnRonda      = 0;
+    int gruposTerminados   = 0;
 
     for (Agente *a : agentes) {
         if (!a) continue;
         if (a->getRondaAsignada() != ronda_act) continue;
+
         gruposEnRonda++;
-        if (a->rondaCompletada()) gruposTerminados++;
+        if (a->rondaCompletada())
+            gruposTerminados++;
     }
 
     // Pasar de ronda
     if (gruposEnRonda > 0 && gruposTerminados == gruposEnRonda) {
         ronda_act++;
-        // TODO: feedback UI "Ronda superada"
+
+        // Si ya pasamos la última ronda -> victoria
+        if (ronda_act > total_rondas) {
+            finJuegoPorVictoria();
+        }
+        // Aquí podrías meter feedback tipo "Ronda superada" si quieres
     }
 }
 
@@ -1178,4 +1414,267 @@ OleadaCadetes* Nivel::encontrarAliadoMasCercanoEnRotacion(OleadaCadetes *petidor
     }
 
     return mejor;
+}
+
+void Nivel::iniciarRecargaJugador()
+{
+    if (!jugador) return;
+    if (recargandoJugador) return;
+
+    // Si ya está al máximo, no tiene sentido recargar
+    if (jugador->getBalasMax() <= 0) return;
+    if (jugador->getBalas() >= jugador->getBalasMax()) return;
+
+    recargandoJugador   = true;
+    recargaTicksActual  = 0;
+
+    if (barraRecarga) {
+        barraRecarga->setRange(0, recargaTicksTotal);
+        barraRecarga->setValue(0);
+        barraRecarga->setVisible(true);
+    }
+}
+
+void Nivel::cancelarRecargaJugador()
+{
+    recargandoJugador  = false;
+    recargaTicksActual = 0;
+
+    if (barraRecarga) {
+        barraRecarga->setVisible(false);
+    }
+}
+
+void Nivel::actualizarRecargaJugador()
+{
+    if (!recargandoJugador)
+        return;
+
+    if (!jugador || jugador->estaMuerto()) {
+        cancelarRecargaJugador();
+        return;
+    }
+
+    // Avanzar el "tiempo" de recarga
+    ++recargaTicksActual;
+
+    if (barraRecarga) {
+        barraRecarga->setValue(recargaTicksActual);
+    }
+
+    // ¿Terminó la recarga?
+    if (recargaTicksActual >= recargaTicksTotal) {
+        recargandoJugador  = false;
+        recargaTicksActual = 0;
+
+        if (barraRecarga) {
+            barraRecarga->setVisible(false);
+        }
+
+        // Aquí se recargan realmente las balas del jugador
+        jugador->recargar();
+    }
+}
+
+void Nivel::finJuegoPorMuerte()
+{
+    if (juegoTerminado)
+        return;
+
+    juegoTerminado = true;
+
+    if (timer)               timer->stop();
+    if (timerDisparoEnemigos) timerDisparoEnemigos->stop();
+
+    mostrarGameOverOverlay(false);
+}
+
+void Nivel::finJuegoPorVictoria()
+{
+    if (juegoTerminado)
+        return;
+
+    juegoTerminado = true;
+
+    if (timer)               timer->stop();
+    if (timerDisparoEnemigos) timerDisparoEnemigos->stop();
+
+    mostrarGameOverOverlay(true);
+}
+
+void Nivel::mostrarGameOverOverlay(bool victoria)
+{
+    if (overlayGameOver) {
+        overlayGameOver->raise();
+        overlayGameOver->show();
+        return;
+    }
+
+    overlayGameOver = new QWidget(this);
+    overlayGameOver->setGeometry(0, 0, width(), height());
+    overlayGameOver->setAttribute(Qt::WA_TransparentForMouseEvents, false);
+    overlayGameOver->setStyleSheet("background-color: rgba(0, 0, 0, 180);");
+
+    auto *rootLayout = new QVBoxLayout(overlayGameOver);
+    rootLayout->setContentsMargins(0, 0, 0, 0);
+
+    QWidget *panel = new QWidget(overlayGameOver);
+    panel->setObjectName("panelGameOver");
+    panel->setStyleSheet(
+        "#panelGameOver {"
+        "  background-color: rgba(15, 15, 25, 230);"
+        "  border-radius: 16px;"
+        "  border: 1px solid rgba(255, 255, 255, 40);"
+        "}"
+        "QLabel {"
+        "  color: #f0f0f0;"
+        "}"
+        "QPushButton {"
+        "  background-color: rgba(60, 60, 90, 220);"
+        "  color: #f0f0f0;"
+        "  border-radius: 8px;"
+        "  padding: 6px 18px;"
+        "  font-weight: 600;"
+        "}"
+        "QPushButton:hover {"
+        "  background-color: rgba(90, 90, 130, 240);"
+        "}"
+        "QPushButton:pressed {"
+        "  background-color: rgba(40, 40, 70, 240);"
+        "}"
+        );
+
+    auto *panelLayout = new QVBoxLayout(panel);
+    panelLayout->setContentsMargins(32, 24, 32, 24);
+    panelLayout->setSpacing(12);
+
+    // --- Título ---
+    lblGameOverTitulo = new QLabel(victoria ? "VICTORIA" : "GAME OVER", panel);
+    lblGameOverTitulo->setAlignment(Qt::AlignCenter);
+    lblGameOverTitulo->setStyleSheet(
+        "font-size: 28px; font-weight: 800; letter-spacing: 4px;"
+        );
+    panelLayout->addWidget(lblGameOverTitulo);
+
+    // --- Estadísticas ---
+    lblGameOverStats = new QLabel(panel);
+    lblGameOverStats->setAlignment(Qt::AlignCenter);
+    lblGameOverStats->setStyleSheet("font-size: 13px; color: #d0d0d0;");
+
+    // calcular stats
+    int totalEnemigos   = 0;
+    int enemigosMuertos = 0;
+
+    for (FuerzaArmada *e : enemigos) {
+        if (!e) continue;
+        ++totalEnemigos;
+        if (e->estaMuerto())
+            ++enemigosMuertos;
+    }
+
+    int rondasCompletadas = ronda_act - 1;
+    if (rondasCompletadas < 0) rondasCompletadas = 0;
+    if (rondasCompletadas > total_rondas) rondasCompletadas = total_rondas;
+
+    int vidaFinal = (jugador ? jugador->getVida() : 0);
+
+    QString textoResumen = QString(
+                               "Rondas completadas: %1 / %2\n"
+                               "Enemigos eliminados: %3 / %4\n"
+                               "Vida final: %5"
+                               ).arg(rondasCompletadas)
+                               .arg(total_rondas)
+                               .arg(enemigosMuertos)
+                               .arg(totalEnemigos)
+                               .arg(vidaFinal);
+
+    lblGameOverStats->setText(textoResumen);
+    panelLayout->addWidget(lblGameOverStats);
+
+    // --- Botones ---
+    auto *buttonsLayout = new QHBoxLayout();
+    buttonsLayout->setSpacing(16);
+    buttonsLayout->setAlignment(Qt::AlignCenter);
+
+    btnReintentar   = new QPushButton("Reintentar", panel);
+    btnMenuGameOver = new QPushButton("Volver al menú", panel);
+
+    buttonsLayout->addWidget(btnReintentar);
+    buttonsLayout->addWidget(btnMenuGameOver);
+
+    panelLayout->addSpacing(8);
+    panelLayout->addLayout(buttonsLayout);
+
+    // Centrar panel en el overlay
+    rootLayout->addStretch();
+    rootLayout->addWidget(panel, 0, Qt::AlignCenter);
+    rootLayout->addStretch();
+
+    // Conexiones de los botones
+    connect(btnReintentar, &QPushButton::clicked, this, [this]() {
+        destruirOverlayGameOver();
+        emit reintentarNivel(numNivel);
+    });
+
+    connect(btnMenuGameOver, &QPushButton::clicked, this, [this]() {
+        destruirOverlayGameOver();
+        emit volverAlMenu();
+    });
+
+    overlayGameOver->raise();
+    overlayGameOver->show();
+}
+
+void Nivel::destruirOverlayGameOver()
+{
+    if (!overlayGameOver)
+        return;
+
+    overlayGameOver->deleteLater();
+    overlayGameOver   = nullptr;
+    lblGameOverTitulo = nullptr;
+    lblGameOverStats  = nullptr;
+    btnReintentar     = nullptr;
+    btnMenuGameOver   = nullptr;
+}
+
+void Nivel::resizeEvent(QResizeEvent *event)
+{
+    QWidget::resizeEvent(event);
+
+    if (hud) {
+        hud->setGeometry(0, 0, width(), height());
+    }
+    if (overlayGameOver) {
+        overlayGameOver->setGeometry(0, 0, width(), height());
+    }
+}
+
+void Nivel::actualizarDebugChunksVisibles()
+{
+    for (Chunk &c : chunks) {
+        if (c.debugRect) {
+            c.debugRect->setVisible(debugChunks);
+        }
+    }
+}
+
+void Nivel::aplicarZoomVista()
+{
+    if (!vista) return;
+
+    // Construimos la transformación desde cero (opción B)
+    QTransform t;
+    t.scale(zoomActual, zoomActual);
+    vista->setTransform(t);
+
+    // Centrar la vista en el jugador (si existe), que está en (0,0)
+    if (jugador) {
+        vista->centerOn(jugador);
+    } else {
+        vista->centerOn(0, 0);
+    }
+
+    // Debug muy breve a consola
+    qDebug() << "[ZOOM]" << zoomActual << "x";
 }

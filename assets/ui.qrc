@@ -34,6 +34,6 @@
         <file>nivel_2/obs_2.png</file>
         <file>nivel_2/obs_1.png</file>
         <file>nivel_2/barco.png</file>
-	<file>nivel_2/torpedo.png</file>
+        <file>nivel_2/torpedo.png</file>
     </qresource>
 </RCC>

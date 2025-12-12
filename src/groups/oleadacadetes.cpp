@@ -2,6 +2,7 @@
 #include "nivel.h"
 #include "cadete.h"
 #include "obstaculo.h"
+#include "constantes_juego.h"
 
 #include <QRandomGenerator>
 #include <QtMath>
@@ -9,12 +10,15 @@
 #include <QList>
 #include <limits>
 
+const int OleadaCadetes::COOLDOWN_DISPARO_TICKS = 30;  // ~0.5s si el timer del nivel es 16ms
+
 // =====================================
 //  Constructor / Destructor (mínimos)
 // =====================================
 
 OleadaCadetes::OleadaCadetes(Nivel *nivelPtr)
-    : Agente(nivelPtr)
+    : Agente(nivelPtr),
+    ticksDesdeUltDisparo(0)
 {
     // Estados por defecto
     accionMoverActiva    = false;
@@ -73,6 +77,9 @@ void OleadaCadetes::spawnRonda(int cantidad,
         Cadete *e = new Cadete(10.0, 0.0, 0.0, /*esJugador=*/false);
         e->setParentItem(fondo);
         e->setPos(posEnFondo);
+
+        // velocidad de enemigos usando constante
+        e->setVelocidad(VELOCIDAD_ENEMIGO);
 
         // Dirección inicial mirando al jugador
         Vector2D dirToPlayer = centro - posScene;
@@ -180,8 +187,6 @@ void OleadaCadetes::actualizar()
         actualizarModoRotacion();
         break;
 
-    // Modos anteriores que aún puedas tener, por ahora se comportan
-    // como ataque directo para no dejar grupos "muertos":
     case ModoGrupo::Flanqueo:
     case ModoGrupo::Emboscada:
         actualizarModoAtaqueDirecto();
@@ -194,7 +199,10 @@ void OleadaCadetes::actualizar()
 
     aplicarAccionDisparar();
 
-    // Mantener municionGrupoActual actualizado para decisiones futuras
+    // 🔫 NUEVO: decidir quién dispara de verdad
+    actualizarDisparos();
+
+    // Mantener munición agregada actualizada
     actualizarMunicionGrupo();
 }
 
@@ -492,6 +500,60 @@ void OleadaCadetes::actualizarModoRotacion()
         break;
     }
     }
+}
+
+void OleadaCadetes::actualizarDisparos()
+{
+    if (!nivel)
+        return;
+
+    // Si este grupo no está en modo de disparar, no hacemos nada
+    if (!accionDispararActiva) {
+        // Podemos dejar el cooldown corriendo o resetearlo; aquí lo reseteo
+        ticksDesdeUltDisparo = 0;
+        return;
+    }
+
+    // Avanzamos el cooldown del grupo
+    ++ticksDesdeUltDisparo;
+
+    // Todavía no toca disparar
+    if (ticksDesdeUltDisparo < COOLDOWN_DISPARO_TICKS)
+        return;
+
+    // Parámetros de comportamiento
+    const int   maxDisparosEsteTick = 3;  // como máximo 3 enemigos disparan a la vez
+    int         disparosHechos      = 0;
+
+    for (FuerzaArmada *e : grupo) {
+        auto *c = dynamic_cast<Cadete*>(e);
+        if (!c || c->estaMuerto())
+            continue;
+
+        // Debe estar marcado como "disparando" por la lógica de modo
+        if (!c->estaDisparando())
+            continue;
+
+        // Sin balas -> nada que hacer
+        if (!c->tieneMunicion())
+            continue;
+
+        // Un poco de aleatoriedad para que no disparen todos a la vez
+        double u = QRandomGenerator::global()->generateDouble();
+        if (u > 0.6)               // ~40% probabilidad de que este cadete dispare en esta ráfaga
+            continue;
+
+        // Pedimos al nivel que cree la bala
+        nivel->disparar(c);
+        ++disparosHechos;
+
+        if (disparosHechos >= maxDisparosEsteTick)
+            break;
+    }
+
+    // Si hubo al menos un disparo, reiniciamos el cooldown
+    if (disparosHechos > 0)
+        ticksDesdeUltDisparo = 0;
 }
 
 bool OleadaCadetes::todosEnCampamento() const

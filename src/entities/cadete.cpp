@@ -11,6 +11,11 @@ Cadete::Cadete(qreal r, qreal x, qreal y, bool esJugador, qreal vida)
     municionActual = 0;
     municionMaxima = 0;
     disparando     = false;
+
+    // Munición inicial para el jugador
+    if (esJugador) {
+        definirMunicion(30, 30);   // 30/30 balas de inicio (ajusta al gusto)
+    }
 }
 
 void Cadete::paint(QPainter *painter,
@@ -68,6 +73,17 @@ bool Cadete::consumirBala()
     --municionActual;
     return true;
 }
+
+int Cadete::getBalas() const
+{
+    return municionActual;
+}
+
+int Cadete::getBalasMax() const
+{
+    return municionMaxima;
+}
+
 
 void Cadete::recibirImpacto(Proyectil* p)
 {
