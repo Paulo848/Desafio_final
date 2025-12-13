@@ -108,6 +108,7 @@ private:
 
     QPixmap m_spriteBarco;
     QPixmap m_spriteTorpedo;
+    QPixmap m_spriteMapaIso;
 };
 
 #endif // NIVELISO_H

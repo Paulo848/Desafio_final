@@ -171,32 +171,38 @@ void NivelIso::paintEvent(QPaintEvent *event)
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing, true);
 
-    // Dibujar fondo con efecto de scrolling
-    dibujarFondoScrolling(painter);
+    // 1. Color de fondo base (por si la imagen no carga)
+    painter.fillRect(rect(), QColor(20, 30, 50));
 
-    // Transformación: origen en centro de pantalla
+    // 2. Transformar al centro
     painter.translate(width() / 2.0, height() / 2.0);
 
-    // Dibujar HUD (vidas, tiempo, munición) en coordenadas de ventana
+    // 3. Dibujar fondo con imagen de agua (SIN clipping)
     painter.save();
     painter.resetTransform();
+    dibujarFondoScrolling(painter);
+    painter.restore();
+
+    // 4. Resetear transformación para HUD
+    painter.resetTransform();
+
+    // 5. Dibujar HUD (vidas, tiempo, munición)
+    painter.save();
     dibujarVidas(painter);
     dibujarTiempo(painter);
     dibujarMunicion(painter);
     painter.restore();
 
-    // Restaurar transformación para elementos del juego
-    painter.resetTransform();
+    // 6. Volver a centrar para elementos del juego
     painter.translate(width() / 2.0, height() / 2.0);
 
-    // Dibujar marco del área jugable
+    // 7. OPCIONAL: Dibujar marco del área jugable
     if (!m_playArea.isNull()) {
         QPointF tl = m_playArea.topLeft();
         QPointF tr = m_playArea.topRight();
         QPointF br = m_playArea.bottomRight();
         QPointF bl = m_playArea.bottomLeft();
 
-        // Proyectar esquinas a pantalla isométrica
         QVector<QPointF> pts;
         pts << ProyeccionIso::toScreen(tl)
             << ProyeccionIso::toScreen(tr)
@@ -204,20 +210,18 @@ void NivelIso::paintEvent(QPaintEvent *event)
             << ProyeccionIso::toScreen(bl);
 
         painter.save();
-        painter.setPen(QPen(Qt::white, 2));
+        painter.setPen(QPen(QColor(255, 255, 255, 100), 2)); // Blanco semi-transparente
         painter.setBrush(Qt::NoBrush);
         painter.drawPolygon(QPolygonF(pts));
         painter.restore();
     }
-    //*/
 
-    // Dibujar barco (con parpadeo si está invulnerable)
+    // 8. Dibujar barco
     QPointF barcoWorld = m_barco.position();
     QPointF barcoScreen = ProyeccionIso::toScreen(barcoWorld);
 
     bool dibujarBarco = true;
     if (m_invulnerable) {
-        // Parpadear cada 5 frames
         dibujarBarco = (m_contadorInvulnerabilidad % 10 < 5);
     }
 
@@ -228,10 +232,8 @@ void NivelIso::paintEvent(QPaintEvent *event)
         if (!m_spriteBarco.isNull()) {
             int w = m_spriteBarco.width();
             int h = m_spriteBarco.height();
-            // centrado en el barco
             painter.drawPixmap(-w / 2, -h / 2, m_spriteBarco);
         } else {
-            // Fallback: el rectángulo de antes
             painter.setBrush(Qt::yellow);
             painter.setPen(Qt::black);
             painter.drawRect(-BARCO_PROFUNDIDAD/2, -BARCO_ANCHO/2,
@@ -241,7 +243,7 @@ void NivelIso::paintEvent(QPaintEvent *event)
         painter.restore();
     }
 
-    // Dibujar obstáculos
+    // 9. Dibujar obstáculos
     for (const Obstaculon2 &o : m_obstaculos) {
         QPointF oWorld  = o.position();
         QPointF oScreen = ProyeccionIso::toScreen(oWorld);
@@ -252,17 +254,14 @@ void NivelIso::paintEvent(QPaintEvent *event)
         if (!m_spritesObstaculos.isEmpty()) {
             int id = o.spriteId();
             if (id < 0 || id >= m_spritesObstaculos.size()) {
-                id = 0; // fallback seguro
+                id = 0;
             }
 
             const QPixmap &pix = m_spritesObstaculos[id];
             int w = pix.width();
             int h = pix.height();
-
-            // dibujar centrado en (0,0) usando tamaño real -> proporciones intactas
             painter.drawPixmap(-w / 2, -h / 2, pix);
         } else {
-            // Fallback: si no hay sprites, dibuja el rectángulo gris de antes
             painter.setBrush(Qt::gray);
             painter.setPen(Qt::black);
             painter.drawRect(-OBS_PROFUNDIDAD/2, -OBS_ANCHO/2,
@@ -272,7 +271,7 @@ void NivelIso::paintEvent(QPaintEvent *event)
         painter.restore();
     }
 
-    // Dibujar torpedos
+    // 10. Dibujar torpedos
     for (const Torpedo &t : m_torpedos) {
         if (t.estaActivo()) {
             QPointF tWorld = t.position();
@@ -281,36 +280,16 @@ void NivelIso::paintEvent(QPaintEvent *event)
             painter.save();
             painter.translate(tScreen);
 
-            // Si tiene sprite, dibujarlo
             if (t.tieneSprite() && !t.getSprite().isNull()) {
                 const QPixmap &sprite = t.getSprite();
                 int w = sprite.width();
                 int h = sprite.height();
-
-                // Dibujar centrado
                 painter.drawPixmap(-w / 2, -h / 2, sprite);
             }
 
             painter.restore();
         }
     }
-
-
-    /*
-    // Dibujar hitboxes de depuración (verde = no colisión, rojo = colisión)
-    //drawHitbox(painter, m_barco.hitbox(), m_barco.position());
-
-
-    for (const Obstaculon2 &o : m_obstaculos) {
-        drawHitbox(painter, o.hitbox(), o.position());
-    }
-
-    for (const Torpedo &t : m_torpedos) {
-        if (t.estaActivo()) {
-            drawHitbox(painter, t.hitbox(), t.position());
-        }
-    }
-    */
 }
 
 void NivelIso::dibujarVidas(QPainter &painter)
@@ -400,34 +379,30 @@ void NivelIso::dibujarMunicion(QPainter &painter)
 
 void NivelIso::dispararTorpedo()
 {
-    // Verificar cooldown y munición disponible
     if (m_cooldownActual > 0 || m_municionActual <= 0) {
         return;
     }
 
-    // Crear torpedo en la posición del barco
+    // Crear torpedo
     Torpedo torpedo;
     QPointF posBarco = m_barco.position();
     torpedo.setPosition(QPointF(posBarco.x() + 20, posBarco.y()));
-    m_torpedos.append(torpedo);
 
-    // Cargar sprite del torpedo
+    // Cargar sprite
     if (!m_spriteTorpedo.isNull()) {
         torpedo.setSprite(m_spriteTorpedo);
     }
 
     m_torpedos.append(torpedo);
 
-    // Activar cooldown y gastar munición
+    // Activar cooldown
     m_cooldownActual = m_cooldownDisparo;
     m_municionActual--;
 
-    // Si se acabó la munición, iniciar recarga automática
     if (m_municionActual == 0) {
         m_contadorRecarga = m_tiempoRecarga;
     }
 
-    // Reproducir sonido
     if (m_sonidoDisparo) {
         m_sonidoDisparo->play();
     }
@@ -454,16 +429,19 @@ void NivelIso::updateTorpedos()
 
 void NivelIso::verificarColisionesTorpedos()
 {
-    // Iterar torpedos en orden inverso para eliminar de forma segura
-    for (int i = m_torpedos.size() - 1; i >= 0; --i) {
-        // Verificar que el torpedo esté activo
+    // Lista de índices de torpedos que deben eliminarse
+    QVector<int> torpedosAEliminar;
+
+    // Verificar cada torpedo
+    for (int i = 0; i < m_torpedos.size(); ++i) {
+        // Solo procesar torpedos activos
         if (!m_torpedos[i].estaActivo()) {
-            m_torpedos.removeAt(i);
+            torpedosAEliminar.append(i);
             continue;
         }
 
         // Verificar colisión con obstáculos
-        bool huboColision = false;
+        bool impacto = false;
 
         for (int j = m_obstaculos.size() - 1; j >= 0; --j) {
             bool colision = m_torpedos[i].hitbox().intersects(
@@ -473,27 +451,34 @@ void NivelIso::verificarColisionesTorpedos()
                 );
 
             if (colision) {
-                // Reproducir sonido
+                // Reproducir sonido de explosión
                 if (m_sonidoExplosion) {
                     m_sonidoExplosion->play();
                 }
 
-                // Eliminar obstáculo
+                // Eliminar el obstáculo impactado
                 m_obstaculos.removeAt(j);
 
-                // Marcar que hubo colisión
-                huboColision = true;
+                // Marcar este torpedo para eliminación
+                torpedosAEliminar.append(i);
+                impacto = true;
 
-                // ===== IMPORTANTE: break para salir del loop de obstáculos =====
+                // El torpedo ya impactó, no debe seguir verificando más obstáculos
                 break;
             }
         }
 
-        // Si hubo colisión, eliminar el torpedo INMEDIATAMENTE
-        if (huboColision) {
-            m_torpedos.removeAt(i);
-            // No continuar verificando más obstáculos con este torpedo
-            // porque ya fue eliminado
+        // Si hubo impacto, no seguir procesando este torpedo
+        if (impacto) {
+            continue;
+        }
+    }
+
+    // Eliminar torpedos marcados (en orden inverso para no afectar índices)
+    for (int i = torpedosAEliminar.size() - 1; i >= 0; --i) {
+        int indice = torpedosAEliminar[i];
+        if (indice >= 0 && indice < m_torpedos.size()) {
+            m_torpedos.removeAt(indice);
         }
     }
 }
@@ -763,25 +748,45 @@ void NivelIso::mostrarGameOver()
 
 void NivelIso::dibujarFondoScrolling(QPainter &painter)
 {
-    // Fondo base (mar nocturno)
-    painter.fillRect(rect(), Qt::darkBlue);
-
-    // Grid que simula movimiento
-    painter.setPen(QColor(40, 60, 120, 100));
-
-    int gridSize = 50;
-    int offsetY = static_cast<int>(m_scrollOffset) % gridSize;
-
-    // Líneas horizontales que se mueven hacia abajo
-    for (int y = -gridSize + offsetY; y < height() + gridSize; y += gridSize) {
-        painter.drawLine(0, y, width(), y);
+    // Cargar la imagen de fondo agua (solo una vez, idealmente en initScene)
+    if (m_spriteMapaIso.isNull()) {
+        m_spriteMapaIso = QPixmap(":/fondos/nivel_2/fondo_agua.png");
     }
 
-    // Líneas verticales (fijas)
-    for (int x = 0; x < width(); x += gridSize) {
-        painter.drawLine(x, 0, x, height());
+    if (!m_spriteMapaIso.isNull()) {
+        // Factor de parallax para efecto de profundidad
+        const qreal parallaxFactor = 0.3;
+        qreal offsetX = m_scrollOffset * parallaxFactor;
+
+        int fondoWidth = m_spriteMapaIso.width();
+        int fondoHeight = m_spriteMapaIso.height();
+
+        // Escalar para llenar toda la pantalla verticalmente
+        qreal scale = static_cast<qreal>(height()) / fondoHeight;
+        int scaledWidth = static_cast<int>(fondoWidth * scale);
+        int scaledHeight = height();
+
+        // Calcular offset con wrapping para scroll infinito
+        int offsetXInt = static_cast<int>(offsetX) % scaledWidth;
+        if (offsetXInt < 0) offsetXInt += scaledWidth;
+
+        // Número de copias necesarias para cubrir el ancho
+        int numCopias = (width() / scaledWidth) + 3;
+
+        // Dibujar múltiples copias del fondo para efecto infinito
+        for (int i = -1; i < numCopias; i++) {
+            int x = i * scaledWidth - offsetXInt;
+            QRectF target(x, 0, scaledWidth, scaledHeight);
+
+            // Dibujar la imagen completa
+            painter.drawPixmap(target, m_spriteMapaIso, m_spriteMapaIso.rect());
+        }
+    } else {
+        // Fallback: si no carga la imagen, usar color sólido
+        painter.fillRect(rect(), QColor(0, 180, 200));
     }
 }
+
 
 void NivelIso::keyPressEvent(QKeyEvent *event)
 {
@@ -1070,6 +1075,9 @@ void NivelIso::drawHitbox(QPainter &painter,
 void NivelIso::cargarSpritesObstaculos()
 {
     m_spritesObstaculos.clear();
+
+    // Fondo
+    m_spriteMapaIso = QPixmap(":/obs/nivel_2/mapa_base.png");
 
     const qreal scaleFactorObs = 0.45;
 
