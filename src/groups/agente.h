@@ -30,7 +30,7 @@ class Agente
 {
 public:
     explicit Agente(Nivel *nivelPtr);
-    Agente(short int _RondaActual = 1, short int _TotalRondas = 1);
+    Agente(short int _RondaActual = 1, short int _TotalRondas = 2);
     virtual ~Agente();
 
     // ----- Gestión de oleadas -----

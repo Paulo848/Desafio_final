@@ -1,6 +1,10 @@
 #ifndef NIVEL_1_H
 #define NIVEL_1_H
 
+#include <QDialog>
+#include <QVBoxLayout>
+#include <QHBoxLayout>
+#include <QLabel>
 #include <QWidget>
 #include <QGraphicsView>
 #include <QGraphicsScene>
@@ -13,6 +17,8 @@
 #include <Qvector>
 #include <QRandomGenerator>
 #include <cstdlib>
+#include <QCheckBox>
+#include <QProgressBar>
 
 class Participantes;
 class Obstaculo;
@@ -53,29 +59,46 @@ private:
 
 
     // Elementos del juego
-    std::vector<Participantes*> participantes;
-    std::vector<Obstaculo*> obstaculos;
     Avion* jugador;
+    short int derribados = 0;
+    short int limit_derribados = 5;
     std::vector<Avion*> enemigos;
     bool HayIA = false;
     OleadaAt_Colectivo* IA;
 
     // UI
+    QWidget* hudWidget;
     QPushButton *btnVolver;
     QTimer* timer;
     QTimer* timer1;
-    QTimer* tiempodesplazarelementos;
+    QTimer* tiempodisparos;
+    QProgressBar* barraVida;
+    QProgressBar* barraOleadas;
+    QLabel* lblRonda;
+    QLabel* lblDanio;
+    QLabel* lblEnemigos;
+    QLabel* lblOleadas;
 
     // Métodos de inicialización
     void inicializarUI();
+    void inicializarHUD();
+    void actualizarHUD();
     void inicializarEscena();
     void cargarElementosNivel();
 
     // Lógica del juego
+    short int OleadasSuperadas = 0;
+    short int TotalOleadas = 0;
+    short int RondasSuperadas = 0;
     void manejarColisiones(Avion* avion);
     bool actualizarIA();
     short int CantEnemigosIA = 3;
     void generarIA();
+    bool generarEnemigos();
+
+    //Finalizacíon Juego.
+    void MostrarResultadosdeJuego();
+    void reiniciarNivel();
 };
 
 

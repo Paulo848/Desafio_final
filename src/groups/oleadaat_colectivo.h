@@ -11,6 +11,8 @@ public:
     OleadaAt_Colectivo();
     ~OleadaAt_Colectivo();
     short int getCantintegrantes() const;
+    short int getOleadaActual() const;
+    short int getCantOleadas() const;
     void Calcular_Desplazamiento(Avion* jugador);
     void setRondas();
     void Generarenemigos();
@@ -25,11 +27,12 @@ public:
 
     // ----- Estado de progreso -----
     bool rondaCompletada() const override;
+    bool GenerarnuevaOleada();
 
 private:
     short int Cantintegrantes = 2;
-    short int CantOleadas = 2;
-    short int OleadaActual = 1;
+    short int CantOleadas = 3;
+    short int OleadaActual = 0;
 };
 
 #endif // OLEADAAT_COLECTIVO_H

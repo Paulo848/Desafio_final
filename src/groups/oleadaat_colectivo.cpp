@@ -17,26 +17,20 @@ short int OleadaAt_Colectivo::getCantintegrantes() const{
 }
 
 void OleadaAt_Colectivo::Calcular_Desplazamiento(Avion* jugador){
+    qreal x, y;
     for (auto it = grupo.begin(); it != grupo.end(); it++){
         Avion* integrante = dynamic_cast<Avion*>(*it);
 
-        qreal dx = jugador->getx() - integrante->getx();
-        qreal dy = jugador->gety() - integrante->gety();
-
-        qreal magnitud = sqrt(dx*dx + dy*dy);
-
-        // Evitar división por cero
-        if (magnitud < 0.001) magnitud = 0.001;
-
-        qreal vy = (dy / magnitud);
-        integrante->setVelocidady(vy * integrante -> getspeedy());
+        x = jugador -> pos().x() - integrante -> pos().x();
+        y = jugador -> pos().y() - integrante -> pos().y();
+        integrante -> setDireccion(Vector2D (x, y).normalizado());
     }
 }
 
 void OleadaAt_Colectivo::setRondas(){
     rondaActual++;
     Cantintegrantes++;
-    OleadaActual = 1;
+    OleadaActual = 0;
     CantOleadas += 2;
 }
 
@@ -48,15 +42,25 @@ void OleadaAt_Colectivo::Generarenemigos(){
         if (cont != 0){
             for (auto it = grupo.begin(); it != grupo.end(); it++){
                 Avion* enemyIA = dynamic_cast<Avion*>(*it);
-                if (std::abs(posy - enemyIA -> gety()) < 35){
+                enemyIA -> setCan_Dispara(false);
+                if (std::abs(posy - enemyIA -> pos().y()) < 35){
                     crear = false;
-                } else if (std::abs(posy - enemyIA -> gety()) < 35){
+                } else if (std::abs(posy - enemyIA -> pos().y()) < 35){
                     crear = false;
                 }
             }
         }
         if (crear){
-            grupo.push_back(new Avion(35, 1500, posy, false, 12));
+            if (OleadaActual == 0){
+                grupo.push_back(new Avion(false, 1495, posy));
+                grupo[cont] -> setVelocidad(20);
+                grupo[cont] -> setVida(5000);
+                Avion* enemyIA = dynamic_cast<Avion*>(grupo[cont]);
+                enemyIA -> setCreados(-1);
+            } else {
+                grupo[cont] -> setPos(1495, posy);
+                grupo[cont] -> muerto = false;
+            }
             cont++;
         }
     }
@@ -64,30 +68,41 @@ void OleadaAt_Colectivo::Generarenemigos(){
 }
 
 bool OleadaAt_Colectivo::Generarnewround(){
-    if (rondaActual <= totalRondas){
-        bool derribados = true;
-        for (auto it = grupo.begin(); it != grupo.end(); it++){
-            Avion* enemyIA = dynamic_cast<Avion*>(*it);
-            if (!enemyIA -> getdestruido()){
-                derribados = false;
+    return rondaActual <= totalRondas;
+}
+
+bool OleadaAt_Colectivo::rondaCompletada() const {
+    return OleadaActual == CantOleadas;
+}
+
+short int OleadaAt_Colectivo::getCantOleadas() const{
+    return CantOleadas;
+}
+
+bool OleadaAt_Colectivo::GenerarnuevaOleada(){
+    if (!rondaCompletada()){
+        for (auto integrante : grupo){
+            if (!integrante -> muerto){
+                return false;
             }
         }
-        return derribados;
+        return true;
     } else {
         return false;
     }
 }
 
-bool OleadaAt_Colectivo::rondaCompletada() const{
-    return OleadaActual > CantOleadas;
+short int OleadaAt_Colectivo::getOleadaActual() const{
+    return OleadaActual;
 }
-
 void OleadaAt_Colectivo::inicializarRondas(int Total){
     totalRondas = Total;
 }
 
 void OleadaAt_Colectivo::actualizar(){
-    return;
+    for (auto integrante : grupo){
+        integrante -> setPos(integrante -> pos().x(), integrante -> pos().y());
+    }
 }
 
 void OleadaAt_Colectivo::spawnRonda(int cantidad, qreal radioMin, qreal radioMax, qreal angMinRad, qreal angMaxRad){

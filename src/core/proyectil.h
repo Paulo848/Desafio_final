@@ -26,12 +26,12 @@ public:
               qreal vel,
               qreal r,
               int dmg);
-    Proyectil();
 
     virtual ~Proyectil() {}
 
     QRectF boundingRect() const override { return bounds; }
     QPainterPath shape() const override;
+    FuerzaArmada* getemisor();
 
     // El cuerpo del movimiento es igual en todos los proyectiles
     virtual void avanzar();
