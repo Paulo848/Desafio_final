@@ -209,6 +209,7 @@ void NivelIso::paintEvent(QPaintEvent *event)
         painter.drawPolygon(QPolygonF(pts));
         painter.restore();
     }
+    //*/
 
     // Dibujar barco (con parpadeo si está invulnerable)
     QPointF barcoWorld = m_barco.position();
@@ -436,12 +437,16 @@ void NivelIso::updateTorpedos()
 {
     // Actualizar posición y eliminar torpedos fuera del área
     for (int i = m_torpedos.size() - 1; i >= 0; --i) {
-        m_torpedos[i].actualizar();
+        // Solo actualizar si está activo
+        if (m_torpedos[i].estaActivo()) {
+            m_torpedos[i].actualizar();
 
-        // Eliminar torpedos que salieron del mapa
-        if (m_torpedos[i].position().x() > m_limiteGeneracion + 100) {
-            m_torpedos.removeAt(i);
-        } else if (!m_torpedos[i].estaActivo()) {
+            // Eliminar torpedos que salieron del mapa (límite derecho)
+            if (m_torpedos[i].position().x() > m_limiteGeneracion + 100) {
+                m_torpedos.removeAt(i);
+            }
+        } else {
+            // Si no está activo, eliminarlo directamente
             m_torpedos.removeAt(i);
         }
     }
@@ -449,11 +454,16 @@ void NivelIso::updateTorpedos()
 
 void NivelIso::verificarColisionesTorpedos()
 {
-    // Detectar colisiones entre torpedos y obstáculos
+    // Iterar torpedos en orden inverso para eliminar de forma segura
     for (int i = m_torpedos.size() - 1; i >= 0; --i) {
+        // Verificar que el torpedo esté activo
         if (!m_torpedos[i].estaActivo()) {
+            m_torpedos.removeAt(i);
             continue;
         }
+
+        // Verificar colisión con obstáculos
+        bool huboColision = false;
 
         for (int j = m_obstaculos.size() - 1; j >= 0; --j) {
             bool colision = m_torpedos[i].hitbox().intersects(
@@ -463,16 +473,27 @@ void NivelIso::verificarColisionesTorpedos()
                 );
 
             if (colision) {
-                // Reproducir sonido de explosión
+                // Reproducir sonido
                 if (m_sonidoExplosion) {
                     m_sonidoExplosion->play();
                 }
 
-                // Destruir obstáculo y desactivar torpedo
+                // Eliminar obstáculo
                 m_obstaculos.removeAt(j);
-                m_torpedos[i].desactivar();
+
+                // Marcar que hubo colisión
+                huboColision = true;
+
+                // ===== IMPORTANTE: break para salir del loop de obstáculos =====
                 break;
             }
+        }
+
+        // Si hubo colisión, eliminar el torpedo INMEDIATAMENTE
+        if (huboColision) {
+            m_torpedos.removeAt(i);
+            // No continuar verificando más obstáculos con este torpedo
+            // porque ya fue eliminado
         }
     }
 }
