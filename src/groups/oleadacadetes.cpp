@@ -1,13 +1,17 @@
 #include "oleadacadetes.h"
+
 #include "nivel.h"
 #include "cadete.h"
 #include "obstaculo.h"
 #include "constantes_juego.h"
 
-#include <QRandomGenerator>
-#include <QtMath>
+#include <QGraphicsScene>
 #include <QGraphicsItem>
 #include <QList>
+
+#include <QRandomGenerator>
+#include <QtMath>
+
 #include <limits>
 
 const int OleadaCadetes::COOLDOWN_DISPARO_TICKS = 30;  // ~0.5s si el timer del nivel es 16ms

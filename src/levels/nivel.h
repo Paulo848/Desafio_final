@@ -1,45 +1,59 @@
 #ifndef NIVEL_H
 #define NIVEL_H
 
+// ============================
+// Qt: includes
+// ============================
 #include <QWidget>
-#include <QGraphicsView>
-#include <QGraphicsScene>
-#include <QGraphicsPixmapItem>
-#include <QTimer>
-#include <QKeyEvent>
-#include <QPushButton>
-#include <QLabel>
-#include <QProgressBar>
-#include <QSoundEffect>
 #include <QRectF>
+
 #include <vector>
 #include <QString>
 
-#include "vector2d.h"
-#include "fuerzaarmada.h"
-#include "cadete.h"
-#include "bala.h"
-#include "obstaculo.h"
-#include "agente.h"
+// ============================
+// Forward declarations (Qt)
+// ============================
+class QTimer;
+class QKeyEvent;
+class QMouseEvent;
+class QEvent;
+class QResizeEvent;
 
+class QGraphicsView;
+class QGraphicsScene;
+class QGraphicsPixmapItem;
+class QGraphicsRectItem;
+
+class QSoundEffect;
+
+class QPushButton;
+class QLabel;
+class QProgressBar;
+
+// ============================
+// Forward declarations (juego)
+// ============================
+class Cadete;
+class Obstaculo;
+class Agente;
+class Proyectil;
 class OleadaCadetes;
 
-class QGraphicsRectItem;
+#include "vector2d.h"
 
 // ----------------------------------------
 //  Estructura de chunk de mapa
 // ----------------------------------------
 struct Chunk
 {
-    Vector2D indiceGrid;           // (fila, columna)
-    QRectF   area;                 // rect en coords locales del fondo
-    Vector2D centro;               // centro del chunk (local fondo)
+    Vector2D indiceGrid;   // (fila, columna)
+    QRectF   area;         // rect en coords locales del fondo
+    Vector2D centro;       // centro del chunk (local fondo)
 
     std::vector<Obstaculo*> obstaculos;
 
     QGraphicsRectItem* debugRect = nullptr;
 };
-
 
 class Nivel : public QWidget
 {
@@ -58,16 +72,13 @@ public:
     inline QGraphicsPixmapItem* getFondoScroll() const { return fondoScroll; }
     inline QGraphicsScene*      getEscena()      const { return escena; }
     inline Vector2D             getfondoSize()   const { return fondoSize; }
-    inline Vector2D             getJugDir()      const { return jugador->getDireccion(); }
+    Vector2D                    getJugDir()      const;
 
     inline void registrarEnemigo(Cadete *e) { if (e) enemigos.push_back(e); }
-
-    inline void registrarAgente(Agente *a) { if (a) agentes.push_back(a); }
+    inline void registrarAgente(Agente *a)  { if (a) agentes.push_back(a); }
 
     inline const std::vector<Agente*>& getAgentes() const { return agentes; }
-
-    // Acceso opcional a la grilla de chunks
-    inline const std::vector<Chunk>& getChunks() const { return chunks; }
+    inline const std::vector<Chunk>&   getChunks()  const { return chunks; }
 
 signals:
     void volverAlMenu();
@@ -89,24 +100,21 @@ private slots:
     void onSonidoAmbienteTerminado();
 
 private:
-
     bool debugChunks = false;
     void actualizarDebugChunksVisibles();
 
     // --- Debug de zoom ---
-    qreal zoomDefault = 2.0;   // 2.0 = default
-    qreal zoomActual = 2.0;   // 2.0 = tamaño normal
-    qreal zoomMin    = 0.1;   // hasta dónde puedes alejar
-    qreal zoomMax    = 2.5;   // hasta dónde puedes acercar
-    qreal zoomStep   = 1.10;  // factor por tecla (15% aprox cada vez)
+    qreal zoomDefault = 2.0;
+    qreal zoomActual  = 2.0;
+    qreal zoomMin     = 0.1;
+    qreal zoomMax     = 2.5;
+    qreal zoomStep    = 1.10;
 
     void aplicarZoomVista();
 
     // ============================
     //  Datos de estado
     // ============================
-
-    // Configuración del nivel
     int     numNivel;
     Vector2D viewportSize;
     Vector2D fondoSize;
@@ -115,60 +123,59 @@ private:
     Vector2D mouseDir;
 
     // Escena y vista
-    QGraphicsView       *vista;
-    QGraphicsScene      *escena;
-    QGraphicsPixmapItem *fondoScroll;
+    QGraphicsView       *vista       = nullptr;
+    QGraphicsScene      *escena      = nullptr;
+    QGraphicsPixmapItem *fondoScroll = nullptr;
 
     // Timers
-    QTimer *timer;
-    QTimer *timerDisparoEnemigos;
+    QTimer *timer = nullptr;
 
     // Entidades
-    Cadete *jugador;
-    std::vector<Cadete*>      enemigos;
-    std::vector<Obstaculo*>   obstaculos;
-    std::vector<Agente*>      agentes;
-    std::vector<Proyectil*>   proyectiles;
+    Cadete *jugador = nullptr;
+    std::vector<Cadete*>    enemigos;
+    std::vector<Obstaculo*> obstaculos;
+    std::vector<Agente*>    agentes;
+    std::vector<Proyectil*> proyectiles;
 
     // Oleadas
-    int ronda_act;
-    int total_rondas;
+    int ronda_act    = 1;
+    int total_rondas = 3;
+
     void coordinarRotacionRonda3();
     OleadaCadetes* encontrarAliadoMasCercanoEnRotacion(OleadaCadetes *petidora);
 
     // Input movimiento
-    bool m_moveLeft;
-    bool m_moveRight;
-    bool m_moveUp;
-    bool m_moveDown;
+    bool m_moveLeft  = false;
+    bool m_moveRight = false;
+    bool m_moveUp    = false;
+    bool m_moveDown  = false;
 
     // HUD
-    QWidget      *hud;
-    QPushButton  *btnVolver;
-    QLabel       *lblEnemigos;
-    QLabel       *lblRonda;
-    QLabel       *lblBalas;
-    QProgressBar *barraVida;
+    QWidget      *hud        = nullptr;
+    QPushButton  *btnVolver  = nullptr;
+    QLabel       *lblEnemigos = nullptr;
+    QLabel       *lblRonda    = nullptr;
+    QLabel       *lblBalas    = nullptr;
+    QProgressBar *barraVida   = nullptr;
 
     // --- Recarga del jugador ---
-    QProgressBar *barraRecarga = nullptr;
-    bool          recargandoJugador = false;
+    QProgressBar *barraRecarga       = nullptr;
+    bool          recargandoJugador  = false;
     int           recargaTicksActual = 0;
-    int           recargaTicksTotal  = 60; // ~1s si el timer es de 16ms
+    int           recargaTicksTotal  = 60;
 
     // --- Game Over / End Game ---
-    bool          juegoTerminado      = false;
-    QWidget      *overlayGameOver     = nullptr;
-    QLabel       *lblGameOverTitulo   = nullptr;
-    QLabel       *lblGameOverStats    = nullptr;
-    QPushButton  *btnReintentar       = nullptr;
-    QPushButton  *btnMenuGameOver     = nullptr;
+    bool          juegoTerminado    = false;
+    QWidget      *overlayGameOver   = nullptr;
+    QLabel       *lblGameOverTitulo = nullptr;
+    QLabel       *lblGameOverStats  = nullptr;
+    QPushButton  *btnReintentar     = nullptr;
+    QPushButton  *btnMenuGameOver   = nullptr;
 
     void finJuegoPorMuerte();
     void finJuegoPorVictoria();
     void mostrarGameOverOverlay(bool victoria = false);
     void destruirOverlayGameOver();
-
 
     // ============================
     //  Recarga jugador
@@ -180,21 +187,17 @@ private:
     // ============================
     //  Chunks del mapa
     // ============================
-
-    int   numColsChunks;   // número de columnas de chunks (lo decides tú)
-    int   numFilasChunks;  // se calcula a partir del alto del fondo
-    qreal chunkWidth;      // ancho de cada chunk (en coords del fondo)
-    qreal chunkHeight;     // alto de cada chunk (en coords del fondo)
+    int   numColsChunks  = 5;
+    int   numFilasChunks = 0;
+    qreal chunkWidth     = 0.0;
+    qreal chunkHeight    = 0.0;
 
     std::vector<Chunk> chunks;
-
-    // Construye la grilla de chunks usando fondoSize, numColsChunks, etc.
     void inicializarChunks();
 
     // ============================
     //  Inicialización
     // ============================
-
     void inicializarUI();
     void inicializarEscena();
     void cargarElementosNivel();
@@ -210,20 +213,12 @@ private:
     void limpiarProyectilesMuertos();
     void desactivarEnemigosMuertos();
     void actualizarHUD();
-    void manejarColisiones();
 
-    // Colisiones / consultas
     bool jugadorTocaObstaculo() const;
 
     // ============================
     //  Obstáculos
     // ============================
-
-    void crearObstaculosFijos();
-    void crearObstaculosAleatorios(int numExtraObst,
-                                   qreal radioMin,
-                                   qreal radioMax);
-
     Obstaculo* crearObstaculoEnChunk(Chunk &chunk,
                                      qreal refHalfSize,
                                      qreal xRef,
@@ -231,17 +226,14 @@ private:
                                      int cuadrante,
                                      const QString &spriteName);
 
-    // Patrones de obstáculos por tipo de chunk (1, 2 y 3)
     void colocarObstaculosPatron1(Chunk &chunk);
     void colocarObstaculosPatron2(Chunk &chunk);
     void colocarObstaculosPatron3(Chunk &chunk);
-
     void poblarObstaculosPatronCiclico();
 
     // ============================
     //  Helpers de oleadas
     // ============================
-
     bool existeRonda(int r) const;
     void crearRonda1();
     void crearRonda2();
@@ -249,14 +241,12 @@ private:
     void activarGruposRondaActual();
     void avanzarRondaSiCompleta();
 
-    void sinergiaEmboscadaRonda2();  // (probablemente la dejes de usar)
-    //sonido
-    QSoundEffect *m_sonidoAmbiente;
+    void sinergiaEmboscadaRonda2();
 
+    // Sonido
+    QSoundEffect *m_sonidoAmbiente = nullptr;
     void cargarSonidos();
     void cargarSonidosDesdeArchivos();
-
-
 };
 
 #endif // NIVEL_H

@@ -1,27 +1,45 @@
 #include "nivel.h"
+
 #include "cadete.h"
-#include "fuerzaarmada.h"
 #include "obstaculo.h"
+#include "bala.h"
+#include "oleadacadetes.h"
 #include "constantes_juego.h"
 
-#include <QVBoxLayout>
+#include <QTimer>
+#include <QGraphicsView>
+#include <QGraphicsScene>
+#include <QGraphicsPixmapItem>
 #include <QGraphicsRectItem>
-#include <QKeyEvent>
-#include <QBrush>
-#include <QPixmap>
-#include <QDebug>
-#include <QMouseEvent>
-#include <QRandomGenerator>
-#include <QDir>
-#include <QCoreApplication>
-#include <QFile>
-#include <algorithm>
+
+#include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QFrame>
 
-#include "bala.h"
-#include "oleadacadetes.h"
+#include <QKeyEvent>
+#include <QMouseEvent>
+#include <QResizeEvent>
+
+#include <QPixmap>
+#include <QTransform>
+#include <QPen>
+#include <QBrush>
+
+#include <QPushButton>
+#include <QLabel>
+#include <QProgressBar>
+
+#include <QSoundEffect>
+#include <QUrl>
+
+#include <QDir>
+#include <QCoreApplication>
+#include <QFile>
+#include <QDebug>
+
+#include <algorithm>
 #include <limits>
+
 
 // ============================
 // 1) Constructor / Destructor
@@ -38,7 +56,6 @@ Nivel::Nivel(int numeroNivel, QWidget *parent, qreal _v_alto, qreal _v_ancho)
     escena(nullptr),
     fondoScroll(nullptr),
     timer(nullptr),
-    timerDisparoEnemigos(nullptr),
     jugador(nullptr),
     mouseDir(0.0, 0.0),
     m_moveLeft(false),
@@ -272,12 +289,6 @@ void Nivel::inicializarUI()
     colBalas->addWidget(lblBalasTitulo);
     colBalas->addWidget(lblBalas);
     panelLayout->addLayout(colBalas);
-
-    //hudRootLayout->addWidget(panelSuperior, 0, Qt::AlignTop | Qt::AlignLeft);
-    //hudRootLayout->addStretch();
-
-    //hudRootLayout->addWidget(panelSuperior, 0, Qt::AlignTop | Qt::AlignLeft);
-    //hudRootLayout->addStretch();
 
     // ------------------------------
     // Barra de recarga (centro abajo)
@@ -606,9 +617,8 @@ void Nivel::actualizarJuego()
     // Recarga jugador
     actualizarRecargaJugador();
 
-    // HUD / colisiones
+    // HUD
     actualizarHUD();
-    manejarColisiones();
 
     // --- Game Over por muerte del jugador ---
     if (jugador && jugador->estaMuerto()) {
@@ -738,7 +748,7 @@ void Nivel::limpiarProyectilesMuertos()
 
 void Nivel::desactivarEnemigosMuertos()
 {
-    for (FuerzaArmada *p : enemigos) {
+    for (Cadete *p : enemigos) {
         if (!p) continue;
         if (p->estaMuerto() && p->scene() != nullptr) {
             escena->removeItem(p);
@@ -779,7 +789,7 @@ void Nivel::actualizarHUD()
     int totalEnemigos   = 0;
     int enemigosMuertos = 0;
 
-    for (FuerzaArmada *e : enemigos) {
+    for (Cadete *e : enemigos) {
         if (!e) continue;
         ++totalEnemigos;
         if (e->estaMuerto())
@@ -875,6 +885,11 @@ bool Nivel::eventFilter(QObject *obj, QEvent *event)
 
 void Nivel::keyReleaseEvent(QKeyEvent *event)
 {
+    if (juegoTerminado) {
+        QWidget::keyReleaseEvent(event);
+        return;
+    }
+
     // Soltar flags
     switch (event->key()) {
     case Qt::Key_A:
@@ -890,6 +905,11 @@ void Nivel::keyReleaseEvent(QKeyEvent *event)
 
 void Nivel::keyPressEvent(QKeyEvent *event)
 {
+    if (juegoTerminado) {
+        QWidget::keyPressEvent(event);
+        return;
+    }
+
     switch (event->key()) {
     case Qt::Key_A:
     case Qt::Key_Left:  m_moveLeft  = true; break;
@@ -985,8 +1005,6 @@ bool Nivel::jugadorTocaObstaculo() const
     return false;
 }
 
-
-void Nivel::manejarColisiones() {}
 void Nivel::onVolverClicked()
 {
     // Volver al menú
@@ -1000,36 +1018,6 @@ void Nivel::onVolverClicked()
 // ============================
 // 6) Helpers
 // ============================
-
-void Nivel::crearObstaculosFijos()
-{
-    // Centro del fondo
-    auto fondoCentro = Vector2D(fondoSize.x() / 2.0, fondoSize.y() / 2.0);
-
-    // Piedra
-    Obstaculo *piedra = new Obstaculo(30);
-    piedra->setParentItem(fondoScroll);
-    piedra->setPos(fondoCentro.x() - 200, fondoCentro.y() - 50);
-    obstaculos.push_back(piedra);
-
-    // Caja
-    Obstaculo *caja = new Obstaculo(60, 40);
-    caja->setParentItem(fondoScroll);
-    caja->setPos(fondoCentro.x() + 150, fondoCentro.y() - 80);
-    obstaculos.push_back(caja);
-
-    // Bulto
-    Obstaculo *bulto = new Obstaculo(20);
-    bulto->setParentItem(fondoScroll);
-    bulto->setPos(fondoCentro.x() - 120, fondoCentro.y() + 120);
-    obstaculos.push_back(bulto);
-
-    // Pared
-    Obstaculo *pared = new Obstaculo(120, 20);
-    pared->setParentItem(fondoScroll);
-    pared->setPos(fondoCentro.x() / 2.0 + 250, fondoCentro.y() + 150);
-    obstaculos.push_back(pared);
-}
 
 bool Nivel::existeRonda(int r) const
 {
@@ -1418,6 +1406,7 @@ OleadaCadetes* Nivel::encontrarAliadoMasCercanoEnRotacion(OleadaCadetes *petidor
 
 void Nivel::iniciarRecargaJugador()
 {
+    if (juegoTerminado) return;
     if (!jugador) return;
     if (recargandoJugador) return;
 
@@ -1484,8 +1473,8 @@ void Nivel::finJuegoPorMuerte()
     juegoTerminado = true;
 
     if (timer)               timer->stop();
-    if (timerDisparoEnemigos) timerDisparoEnemigos->stop();
 
+    cancelarRecargaJugador();
     mostrarGameOverOverlay(false);
 }
 
@@ -1497,8 +1486,8 @@ void Nivel::finJuegoPorVictoria()
     juegoTerminado = true;
 
     if (timer)               timer->stop();
-    if (timerDisparoEnemigos) timerDisparoEnemigos->stop();
 
+    cancelarRecargaJugador();
     mostrarGameOverOverlay(true);
 }
 
@@ -1565,7 +1554,7 @@ void Nivel::mostrarGameOverOverlay(bool victoria)
     int totalEnemigos   = 0;
     int enemigosMuertos = 0;
 
-    for (FuerzaArmada *e : enemigos) {
+    for (Cadete *e : enemigos) {
         if (!e) continue;
         ++totalEnemigos;
         if (e->estaMuerto())
@@ -1677,4 +1666,10 @@ void Nivel::aplicarZoomVista()
 
     // Debug muy breve a consola
     qDebug() << "[ZOOM]" << zoomActual << "x";
+}
+
+Vector2D Nivel::getJugDir() const
+{
+    if (!jugador) return Vector2D::nulo();
+    return jugador->getDireccion();
 }
