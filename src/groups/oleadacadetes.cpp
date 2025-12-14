@@ -94,7 +94,6 @@ void OleadaCadetes::spawnRonda(int cantidad,
 
         grupo.push_back(e);
         nivel->registrarEnemigo(e);  // el Nivel también los conoce
-        qDebug() << "Spawn enemigo en scene:" << e->scenePos();
 
     }
 
@@ -307,14 +306,6 @@ void OleadaCadetes::actualizarModoCampamento()
 
     case EstadoGrupo::EnPosicion:
     {
-        /*
-         *
-        qDebug() << "        magnitud : | " << diffJugador.magnitud();
-        qDebug() << "dif = |" << diffJugador.x() << " , " << diffJugador.y();
-        qDebug() << " campoCenterScene " << campCenterSce.x() << " , " << campCenterSce.y();
-        qDebug() << " campoCenter " << campCenterSce.x() << " , " << campCenterSce.y();
-        qDebug() << " jugador "  << posJugador.x() << " , " << posJugador.y();
-        */
         // Fase: quietos en campamento, sin disparar.
         accionMoverActiva    = false;
         accionDispararActiva = false;
@@ -558,37 +549,6 @@ void OleadaCadetes::actualizarDisparos()
     // Si hubo al menos un disparo, reiniciamos el cooldown
     if (disparosHechos > 0)
         ticksDesdeUltDisparo = 0;
-}
-
-bool OleadaCadetes::todosEnCampamento() const
-{
-    // Si no hay puntos definidos, consideramos que no hay nada que comprobar.
-    if (puntosCampamento.empty())
-        return true;
-
-    const qreal radioLlegadaCamp  = 25.0;
-    const qreal radioLlegadaCamp2 = radioLlegadaCamp * radioLlegadaCamp;
-
-    for (FuerzaArmada *e : grupo) {
-        if (!e || e->estaMuerto())
-            continue;
-
-        Vector2D posScene(e->scenePos());
-
-        // Buscar el punto de campamento más cercano
-        qreal minDist2 = std::numeric_limits<qreal>::max();
-        for (const auto &p : puntosCampamento) {
-            qreal d2 = (posScene - p).magnitud2();
-            if (d2 < minDist2)
-                minDist2 = d2;
-        }
-
-        // Si este cadete está demasiado lejos de todos los puntos, aún no estamos "en campamento"
-        if (minDist2 > radioLlegadaCamp2)
-            return false;
-    }
-
-    return true;
 }
 
 bool OleadaCadetes::rondaCompletada() const
@@ -850,21 +810,6 @@ Vector2D OleadaCadetes::reaccionarColision(Obstaculo *obs,
 
     return new_pos;
 }
-
-bool OleadaCadetes::disponibleParaRelevo() const
-{
-    // Solo tiene sentido en modo Rotación
-    if (modo != ModoGrupo::Rotacion)
-        return false;
-
-    // Sin enemigos, no hay a quién mandar
-    if (enemigosRestantes <= 0)
-        return false;
-
-    // Disponible si ya está en fase EsperandoOrden (ya replegado y recargado)
-    return (estadoRotacion == EstadoRotacion::EsperandoOrden);
-}
-
 
 // ===================================================
 //  Configuración básica desde Nivel (implementación)

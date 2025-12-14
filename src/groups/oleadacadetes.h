@@ -59,10 +59,6 @@ public:
     // Flags para que Nivel coordine rotación entre oleadas
     inline bool estaPidiendoRefuerzo() const { return pidiendoRefuerzo; }
     inline void limpiarPeticionRefuerzo()    { pidiendoRefuerzo = false; }
-    // --- API específica de Rotación para que Nivel coordine relevo ---
-    // Devuelve true si este grupo está en modo Rotación, con enemigos vivos
-    // y ya replegado/recargado esperando que lo llamen.
-    bool disponibleParaRelevo() const;
 
 private:
     // ============================
@@ -168,8 +164,6 @@ private:
     // Recuenta enemigos vivos/muertos y marca activo/Muerto
     void actualizarEstadoVivosYMuertos();
 
-    // (Opcional) para saber si ya todos llegaron a sus slots de campamento
-    bool todosEnCampamento() const;
 };
 
 #endif // OLEADACADETES_H

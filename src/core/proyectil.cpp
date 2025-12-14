@@ -30,6 +30,7 @@ QPainterPath Proyectil::shape() const
 
 void Proyectil::avanzar()
 {
+    if (!scene()) { muerto = true; return; }
     if (muerto) return;
 
     // Avance normal
