@@ -211,6 +211,7 @@ private:
     void avanzarRondaSiCompleta();
 
     void sinergiaEmboscadaRonda2();  // (probablemente la dejes de usar)
+
     //sonido
     QSoundEffect *m_sonidoAmbiente;
 

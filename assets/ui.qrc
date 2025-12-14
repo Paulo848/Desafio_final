@@ -3,6 +3,7 @@
         <file>ui/Fondo_Nivel_3.png</file>
         <file>ui/Fondo1.png</file>
         <file>nivel_3/fondo_nivel_3.png</file>
+	<file>ui/fondo_menu.png</file>
     </qresource>
     <qresource prefix="/obs">
         <file>nivel_3/Piedra_3.png</file>

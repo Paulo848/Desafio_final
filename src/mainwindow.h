@@ -3,6 +3,10 @@
 
 #include <QMainWindow>
 #include <QStackedWidget>
+#include <QDir>
+#include <QSoundEffect>
+#include <QCoreApplication>
+#include <QFile>
 #include "NivelIso.h"
 #include "levels/nivel.h"
 #include "nivel_1.h"
@@ -24,6 +28,7 @@ private slots:
     void cargarNivel2();
     void cargarNivel3();
     void mostrarMenuPrincipal();
+    void onSonidoAmbienteTerminado();
 
 private:
     Ui::MainWindow *ui;
@@ -31,6 +36,12 @@ private:
     Nivel *nivelActual;
     NivelIso *nivelActualIso = nullptr;
     Nivel_1 *nivelActual_;
+
+    //sonido
+    QSoundEffect *m_sonidoAmbiente;
+
+    void cargarSonidos();
+    void cargarSonidosDesdeArchivos();
 };
 
 #endif // MAINWINDOW_H

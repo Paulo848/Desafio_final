@@ -54,7 +54,6 @@ NivelIso::NivelIso(QWidget *parent)
     m_btnMenu(nullptr),
     m_obstaculosDestruidos(0) // Decoracion menu
 {
-    // Este widget necesita recibir eventos de teclado
     setFocusPolicy(Qt::StrongFocus);
 
     // Cargar sonidos y configurar escena inicial
@@ -62,7 +61,6 @@ NivelIso::NivelIso(QWidget *parent)
     cargarSpritesObstaculos();
     initScene();
 
-    // Timer del game loop (aproximadamente 60 FPS)
     connect(m_timer, &QTimer::timeout, this, &NivelIso::updateGame);
     m_timer->start(16);
 
@@ -147,7 +145,7 @@ QSize NivelIso::sizeHint() const
 
 void NivelIso::initScene()
 {
-    // Barco FIJO en posición inicial (cerca del jugador, centrado lateralmente)
+    // Barcoen posición inicial
     m_barco.setPosition(QPointF(-150.0, 0.0));
 
     // Limpiar obstáculos previos
@@ -163,14 +161,14 @@ void NivelIso::initScene()
         // --- asignar sprite aleatorio ---
         if (!m_spritesObstaculos.isEmpty()) {
             int n = m_spritesObstaculos.size();
-            int id = QRandomGenerator::global()->bounded(n); // [0, n)
+            int id = QRandomGenerator::global()->bounded(n);
             o.setSpriteId(id);
         }
 
         m_obstaculos.append(o);
     }
 
-    // Definir área jugable ...
+    // Definir área jugable
     m_playArea = QRectF(-200.0, -150.0, 400.0, 300.0);
 }
 
@@ -181,32 +179,32 @@ void NivelIso::paintEvent(QPaintEvent *event)
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing, true);
 
-    // 1. Color de fondo base (por si la imagen no carga)
+    // Color de fondo base (por si la imagen no carga)
     painter.fillRect(rect(), QColor(20, 30, 50));
 
-    // 2. Transformar al centro
+    // Transformar al centro
     painter.translate(width() / 2.0, height() / 2.0);
 
-    // 3. Dibujar fondo con imagen de agua
+    // Dibujar fondo con imagen de agua
     painter.save();
     painter.resetTransform();
     dibujarFondoScrolling(painter);
     painter.restore();
 
-    // 4. Resetear transformación para HUD
+    // Resetear transformación para HUD
     painter.resetTransform();
 
-    // 5. Dibujar HUD (vidas, tiempo, munición)
+    // Dibujar HUD (vidas, tiempo, munición)
     painter.save();
     dibujarVidas(painter);
     dibujarTiempo(painter);
     dibujarMunicion(painter);
     painter.restore();
 
-    // 6. Volver a centrar para elementos del juego
+    // Volver a centrar para elementos del juego
     painter.translate(width() / 2.0, height() / 2.0);
 
-    // 7. OPCIONAL: Dibujar marco del área jugable
+    // Dibujar marco del área jugable
     if (!m_playArea.isNull()) {
         QPointF tl = m_playArea.topLeft();
         QPointF tr = m_playArea.topRight();
@@ -220,13 +218,13 @@ void NivelIso::paintEvent(QPaintEvent *event)
             << ProyeccionIso::toScreen(bl);
 
         painter.save();
-        painter.setPen(QPen(QColor(255, 255, 255, 100), 2)); // Blanco semi-transparente
+        painter.setPen(QPen(QColor(255, 255, 255, 100), 2));
         painter.setBrush(Qt::NoBrush);
         painter.drawPolygon(QPolygonF(pts));
         painter.restore();
     }
 
-    // 8. Dibujar barco
+    // Dibujar barco
     QPointF barcoWorld = m_barco.position();
     QPointF barcoScreen = ProyeccionIso::toScreen(barcoWorld);
 
@@ -253,7 +251,7 @@ void NivelIso::paintEvent(QPaintEvent *event)
         painter.restore();
     }
 
-    // 9. Dibujar obstáculos
+    // Dibujar obstáculos
     for (const Obstaculon2 &o : m_obstaculos) {
         QPointF oWorld  = o.position();
         QPointF oScreen = ProyeccionIso::toScreen(oWorld);
@@ -281,7 +279,7 @@ void NivelIso::paintEvent(QPaintEvent *event)
         painter.restore();
     }
 
-    // 10. Dibujar torpedos
+    // Dibujar torpedos
     for (const Torpedo &t : m_torpedos) {
         if (t.estaActivo()) {
             QPointF tWorld = t.position();
@@ -316,11 +314,11 @@ void NivelIso::dibujarVidas(QPainter &painter)
         QRect corazonRect(x + i * spacing, y, size, size);
 
         if (i < m_vidas) {
-            // Corazón lleno (vida disponible)
+            // Corazón lleno
             painter.setBrush(Qt::red);
             painter.setPen(Qt::darkRed);
         } else {
-            // Corazón vacío (vida perdida)
+            // Corazón vacío
             painter.setBrush(Qt::darkGray);
             painter.setPen(Qt::gray);
         }
@@ -328,7 +326,6 @@ void NivelIso::dibujarVidas(QPainter &painter)
         painter.drawEllipse(corazonRect);
     }
 
-    // Texto con cantidad de vidas
     painter.setPen(Qt::white);
     QFont font = painter.font();
     font.setPointSize(12);
@@ -344,7 +341,6 @@ void NivelIso::dibujarMunicion(QPainter &painter)
 {
     painter.save();
 
-    // Posición debajo de las vidas
     int x = 120;
     int y = 50;
     int size = 18;
@@ -426,12 +422,11 @@ void NivelIso::updateTorpedos()
         if (m_torpedos[i].estaActivo()) {
             m_torpedos[i].actualizar();
 
-            // Eliminar torpedos que salieron del mapa (límite derecho)
+            // Eliminar torpedos que salieron del mapa
             if (m_torpedos[i].position().x() > m_limiteGeneracion + 100) {
                 m_torpedos.removeAt(i);
             }
         } else {
-            // Si no está activo, eliminarlo directamente
             m_torpedos.removeAt(i);
         }
     }
@@ -567,12 +562,12 @@ void NivelIso::dibujarTiempo(QPainter &painter)
     textRect.adjust(-15, -8, 15, 8);
     textRect.moveTo(x - 15, y - 8);
 
-    // Fondo semi-transparente
+    // Fondo
     painter.setBrush(QColor(0, 0, 0, 180));
     painter.setPen(Qt::NoPen);
     painter.drawRoundedRect(textRect, 5, 5);
 
-    // Color del texto según urgencia
+    // Color del texto
     QColor colorTexto;
     if (segundosRestantes <= 5) {
         colorTexto = Qt::red;
@@ -596,7 +591,7 @@ void NivelIso::dibujarTiempo(QPainter &painter)
     painter.setPen(QPen(Qt::white, 1));
     painter.drawRect(barX, barY, barWidth, barHeight);
 
-    // Progreso (se llena conforme pasa el tiempo)
+    // Progreso
     qreal progreso = qMin(1.0, static_cast<qreal>(m_tiempoTranscurrido) / m_tiempoParaGanar);
     int progressWidth = static_cast<int>(barWidth * progreso);
 
@@ -700,13 +695,12 @@ void NivelIso::mostrarGameOver()
 
 void NivelIso::dibujarFondoScrolling(QPainter &painter)
 {
-    // Cargar la imagen de fondo agua (solo una vez, idealmente en initScene)
+    // Cargar la imagen de fondo agua
     if (m_spriteMapaIso.isNull()) {
         m_spriteMapaIso = QPixmap(":/fondos/nivel_2/fondo_agua.png");
     }
 
     if (!m_spriteMapaIso.isNull()) {
-        // Factor de parallax para efecto de profundidad
         const qreal parallaxFactor = 0.3;
         qreal offsetX = m_scrollOffset * parallaxFactor;
 
@@ -718,14 +712,11 @@ void NivelIso::dibujarFondoScrolling(QPainter &painter)
         int scaledWidth = static_cast<int>(fondoWidth * scale);
         int scaledHeight = height();
 
-        // Calcular offset con wrapping para scroll infinito
         int offsetXInt = static_cast<int>(offsetX) % scaledWidth;
         if (offsetXInt < 0) offsetXInt += scaledWidth;
 
-        // Número de copias necesarias para cubrir el ancho
         int numCopias = (width() / scaledWidth) + 3;
 
-        // Dibujar múltiples copias del fondo para efecto infinito
         for (int i = -1; i < numCopias; i++) {
             int x = i * scaledWidth - offsetXInt;
             QRectF target(x, 0, scaledWidth, scaledHeight);
@@ -734,7 +725,6 @@ void NivelIso::dibujarFondoScrolling(QPainter &painter)
             painter.drawPixmap(target, m_spriteMapaIso, m_spriteMapaIso.rect());
         }
     } else {
-        // Fallback: si no carga la imagen, usar color sólido
         painter.fillRect(rect(), QColor(0, 180, 200));
     }
 }
@@ -783,7 +773,6 @@ void NivelIso::keyReleaseEvent(QKeyEvent *event)
 
 void NivelIso::updateGame()
 {
-    // No actualizar si el nivel está completado
     if (m_nivelCompletado) {
         return;
     }
@@ -830,7 +819,7 @@ void NivelIso::updateGame()
     updateDificultad();
     updateCollisions();
 
-    // Actualizar offset del fondo (efecto de scrolling)
+    // Actualizar offset del fondo
     m_scrollOffset += m_scrollSpeed;
 
     // Solicitar repintado
@@ -843,7 +832,7 @@ void NivelIso::updateBarcoFromInput()
 
     qreal dirY = 0.0;
 
-    // Solo movimiento lateral (eje Y del mundo)
+    // Solo movimiento lateral
     if (m_moveLeft)
         dirY -= 1.0;
 
@@ -863,7 +852,6 @@ void NivelIso::updateBarcoFromInput()
             posicionNueva.setY(m_playArea.bottom());
     }
 
-    // Aplicar posición temporalmente
     m_barco.setPosition(posicionNueva);
 
     // Verificar colisión con obstáculos
@@ -885,7 +873,7 @@ void NivelIso::updateBarcoFromInput()
 
 void NivelIso::updateObstaculos()
 {
-    // Mover obstáculos hacia el barco (scrolling automático)
+    // Mover obstáculos hacia el barco
     for (int i = m_obstaculos.size() - 1; i >= 0; --i) {
         QPointF pos = m_obstaculos[i].position();
         pos.setX(pos.x() - m_scrollSpeed);
@@ -923,10 +911,10 @@ void NivelIso::generarNuevosObstaculos()
 
             o.setPosition(QPointF(x, y));
 
-            // - asignar sprite aleatorio ---
+            // asignar sprite aleatorio
             if (!m_spritesObstaculos.isEmpty()) {
                 int n = m_spritesObstaculos.size();
-                int id = QRandomGenerator::global()->bounded(n); // [0, n)
+                int id = QRandomGenerator::global()->bounded(n);
                 o.setSpriteId(id);
             }
 
@@ -963,7 +951,7 @@ void NivelIso::updateCollisions()
                 // Perder vida y activar invulnerabilidad
                 m_vidas--;
                 m_invulnerable = true;
-                m_contadorInvulnerabilidad = 120;  // 2 segundos
+                m_contadorInvulnerabilidad = 120;
 
                 // Verificar game over
                 if (m_vidas <= 0) {
@@ -1010,7 +998,6 @@ void NivelIso::drawHitbox(QPainter &painter,
     }
 
     painter.save();
-    // Verde = sin colisión, Rojo = colisión activa
     painter.setPen(hitbox.isColliding() ? Qt::red : Qt::green);
     painter.setBrush(Qt::NoBrush);
 
@@ -1073,7 +1060,7 @@ void NivelIso::cargarSpritesObstaculos()
 
 void NivelIso::crearOverlayResultado()
 {
-    // Ventana que cubre TODO el widget (sin márgenes)
+    // Ventana que cubre todo
     m_widgetOverlay = new QWidget(this);
     m_widgetOverlay->setGeometry(0, 0, width(), height());
     m_widgetOverlay->setStyleSheet(
@@ -1083,7 +1070,7 @@ void NivelIso::crearOverlayResultado()
         );
     m_widgetOverlay->hide();
 
-    // Caja Central (puedes hacerla más grande si quieres)
+    // Caja Central
     m_contenedorResultado = new QWidget(m_widgetOverlay);
     m_contenedorResultado->setFixedSize(600, 400);
     m_contenedorResultado->setStyleSheet(
@@ -1170,7 +1157,7 @@ void NivelIso::crearOverlayResultado()
     layoutBotones->addWidget(m_btnMenu);
     layoutBotones->addStretch();
 
-    // Ensamblar
+    // Implementar
     layoutPrincipal->addWidget(m_lblTitulo);
     layoutPrincipal->addSpacing(20);
     layoutPrincipal->addWidget(m_lblTiempo);
