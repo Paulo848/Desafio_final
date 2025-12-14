@@ -43,7 +43,16 @@ NivelIso::NivelIso(QWidget *parent)
     m_contadorRecarga(0),
     m_tiempoRecarga(240),     // 240 frames = 4 segundos para recargar
     m_sonidoDisparo(nullptr),
-    m_sonidoExplosion(nullptr)
+    m_sonidoExplosion(nullptr),
+    m_widgetOverlay(nullptr),
+    m_contenedorResultado(nullptr),
+    m_lblTitulo(nullptr),
+    m_lblTiempo(nullptr),
+    m_lblObstaculos(nullptr),
+    m_lblVida(nullptr),
+    m_btnReintentar(nullptr),
+    m_btnMenu(nullptr),
+    m_obstaculosDestruidos(0) // Decoracion menu
 {
     // Este widget necesita recibir eventos de teclado
     setFocusPolicy(Qt::StrongFocus);
@@ -63,6 +72,7 @@ NivelIso::NivelIso(QWidget *parent)
     connect(btnVolver, &QPushButton::clicked, this, [this]() {
         emit volverAlMenu();
     });
+    crearOverlayResultado();
 }
 
 NivelIso::~NivelIso()
@@ -177,7 +187,7 @@ void NivelIso::paintEvent(QPaintEvent *event)
     // 2. Transformar al centro
     painter.translate(width() / 2.0, height() / 2.0);
 
-    // 3. Dibujar fondo con imagen de agua (SIN clipping)
+    // 3. Dibujar fondo con imagen de agua
     painter.save();
     painter.resetTransform();
     dibujarFondoScrolling(painter);
@@ -429,20 +439,17 @@ void NivelIso::updateTorpedos()
 
 void NivelIso::verificarColisionesTorpedos()
 {
-    // Lista de índices de torpedos que deben eliminarse
-    QVector<int> torpedosAEliminar;
-
-    // Verificar cada torpedo
-    for (int i = 0; i < m_torpedos.size(); ++i) {
-        // Solo procesar torpedos activos
+    // Iterar en orden inverso para poder eliminar de forma segura
+    for (int i = m_torpedos.size() - 1; i >= 0; --i) {
+        // Verificar que el torpedo esté activo
         if (!m_torpedos[i].estaActivo()) {
-            torpedosAEliminar.append(i);
+            m_torpedos.removeAt(i);
             continue;
         }
 
-        // Verificar colisión con obstáculos
-        bool impacto = false;
+        bool huboColision = false;
 
+        // Verificar colisión con obstáculos
         for (int j = m_obstaculos.size() - 1; j >= 0; --j) {
             bool colision = m_torpedos[i].hitbox().intersects(
                 m_obstaculos[j].hitbox(),
@@ -451,34 +458,27 @@ void NivelIso::verificarColisionesTorpedos()
                 );
 
             if (colision) {
-                // Reproducir sonido de explosión
+                // Reproducir sonido
                 if (m_sonidoExplosion) {
                     m_sonidoExplosion->play();
                 }
 
-                // Eliminar el obstáculo impactado
+                m_obstaculosDestruidos++;
+
+                // Eliminar obstáculo
                 m_obstaculos.removeAt(j);
 
-                // Marcar este torpedo para eliminación
-                torpedosAEliminar.append(i);
-                impacto = true;
+                // Marcar colisión
+                huboColision = true;
 
-                // El torpedo ya impactó, no debe seguir verificando más obstáculos
+                // Salir del loop de obstáculos
                 break;
             }
         }
 
-        // Si hubo impacto, no seguir procesando este torpedo
-        if (impacto) {
-            continue;
-        }
-    }
-
-    // Eliminar torpedos marcados (en orden inverso para no afectar índices)
-    for (int i = torpedosAEliminar.size() - 1; i >= 0; --i) {
-        int indice = torpedosAEliminar[i];
-        if (indice >= 0 && indice < m_torpedos.size()) {
-            m_torpedos.removeAt(indice);
+        // Si hubo colisión, eliminar el torpedo
+        if (huboColision) {
+            m_torpedos.removeAt(i);
         }
     }
 }
@@ -662,7 +662,6 @@ void NivelIso::reiniciarNivel()
 {
     m_timer->stop();
 
-    // Reiniciar todas las variables de juego
     m_vidas = m_vidasMaximas;
     m_invulnerable = false;
     m_contadorInvulnerabilidad = 0;
@@ -679,8 +678,10 @@ void NivelIso::reiniciarNivel()
     m_municionActual = m_municionMaxima;
     m_contadorRecarga = 0;
 
-    // Reconfigurar escena
+    m_obstaculosDestruidos = 0;
+
     initScene();
+    m_barcoPosPrevio = m_barco.position();
 
     m_timer->start(16);
 }
@@ -688,62 +689,13 @@ void NivelIso::reiniciarNivel()
 void NivelIso::mostrarVictoria()
 {
     m_timer->stop();
-
-    QMessageBox msgBox(this);
-    msgBox.setWindowTitle("¡Victoria!");
-    msgBox.setText("¡Ganaste!");
-    msgBox.setInformativeText(QString("Has sobrevivido 20 segundos.\n\n"
-                                      "Vidas restantes: %1 / %2 \n\n"
-                                      "¿Qué deseas hacer?")
-                                  .arg(m_vidas)
-                                  .arg(m_vidasMaximas));
-
-    QPushButton *btnReiniciar = msgBox.addButton("Reiniciar Nivel", QMessageBox::ActionRole);
-    QPushButton *btnMenu = msgBox.addButton("Volver al Menú", QMessageBox::ActionRole);
-
-    msgBox.setDefaultButton(btnReiniciar);
-    msgBox.exec();
-
-    if (msgBox.clickedButton() == btnReiniciar) {
-        reiniciarNivel();
-    } else if (msgBox.clickedButton() == btnMenu) {
-        emit volverAlMenu();
-    }
+    mostrarOverlay(true);
 }
 
 void NivelIso::mostrarGameOver()
 {
     m_timer->stop();
-
-    qreal segundosSobrevividos = m_tiempoTranscurrido / 60.0;
-    qreal segundosRestantes = (m_tiempoParaGanar - m_tiempoTranscurrido) / 60.0;
-
-    QMessageBox msgBox(this);
-    msgBox.setWindowTitle("Game Over");
-    msgBox.setText("¡Perdiste todas tus vidas!");
-
-    msgBox.setInformativeText(
-        QString("Te quedaste sin vidas.\n\n"
-                "Estadísticas:\n"
-                "Tiempo sobrevivido: %1 segundos\n"
-                "Te faltaban: %2 segundos\n"
-                "¿Qué deseas hacer?")
-            .arg(segundosSobrevividos, 0, 'f', 1)
-            .arg(segundosRestantes, 0, 'f', 1)
-        );
-
-    QPushButton *btnReiniciar = msgBox.addButton("Reintentar", QMessageBox::ActionRole);
-    QPushButton *btnMenu = msgBox.addButton("Menú Principal", QMessageBox::ActionRole);
-
-    msgBox.setDefaultButton(btnReiniciar);
-    msgBox.setIcon(QMessageBox::Warning);
-    msgBox.exec();
-
-    if (msgBox.clickedButton() == btnReiniciar) {
-        reiniciarNivel();
-    } else if (msgBox.clickedButton() == btnMenu) {
-        emit volverAlMenu();
-    }
+    mostrarOverlay(false);
 }
 
 void NivelIso::dibujarFondoScrolling(QPainter &painter)
@@ -791,11 +743,9 @@ void NivelIso::dibujarFondoScrolling(QPainter &painter)
 void NivelIso::keyPressEvent(QKeyEvent *event)
 {
     switch (event->key()) {
-    case Qt::Key_A:
     case Qt::Key_Left:
         m_moveLeft = true;
         break;
-    case Qt::Key_D:
     case Qt::Key_Right:
         m_moveRight = true;
         break;
@@ -815,11 +765,9 @@ void NivelIso::keyPressEvent(QKeyEvent *event)
 void NivelIso::keyReleaseEvent(QKeyEvent *event)
 {
     switch (event->key()) {
-    case Qt::Key_A:
     case Qt::Key_Left:
         m_moveLeft = false;
         break;
-    case Qt::Key_D:
     case Qt::Key_Right:
         m_moveRight = false;
         break;
@@ -1121,6 +1069,199 @@ void NivelIso::cargarSpritesObstaculos()
                                                  Qt::KeepAspectRatio,
                                                  Qt::SmoothTransformation);
     }
+}
+
+void NivelIso::crearOverlayResultado()
+{
+    // Ventana que cubre TODO el widget (sin márgenes)
+    m_widgetOverlay = new QWidget(this);
+    m_widgetOverlay->setGeometry(0, 0, width(), height());
+    m_widgetOverlay->setStyleSheet(
+        "QWidget {"
+        "    background-color: rgba(0, 0, 0, 180);"
+        "}"
+        );
+    m_widgetOverlay->hide();
+
+    // Caja Central (puedes hacerla más grande si quieres)
+    m_contenedorResultado = new QWidget(m_widgetOverlay);
+    m_contenedorResultado->setFixedSize(600, 400);
+    m_contenedorResultado->setStyleSheet(
+        "QWidget {"
+        "    background-color: rgba(30, 35, 45, 240);"
+        "    border-radius: 20px;"
+        "    border: 3px solid rgba(255, 255, 255, 100);"
+        "}"
+        );
+
+    // Layout del contenedor
+    QVBoxLayout *layoutPrincipal = new QVBoxLayout(m_contenedorResultado);
+    layoutPrincipal->setSpacing(20);
+    layoutPrincipal->setContentsMargins(40, 40, 40, 40);
+
+    // Título
+    m_lblTitulo = new QLabel("VICTORIA", m_contenedorResultado);
+    m_lblTitulo->setAlignment(Qt::AlignCenter);
+    m_lblTitulo->setStyleSheet(
+        "QLabel {"
+        "    color: #4FFFB0;"
+        "    font-size: 48px;"
+        "    font-weight: bold;"
+        "    border: none;"
+        "    background: transparent;"
+        "}"
+        );
+
+    // Estadísticas
+    QString estiloEstadistica =
+        "QLabel {"
+        "    color: #E0E0E0;"
+        "    font-size: 18px;"
+        "    border: none;"
+        "    background: transparent;"
+        "    padding: 5px;"
+        "}";
+
+    m_lblTiempo = new QLabel("Tiempo sobrevivido: 0.0s", m_contenedorResultado);
+    m_lblTiempo->setAlignment(Qt::AlignCenter);
+    m_lblTiempo->setStyleSheet(estiloEstadistica);
+
+    m_lblObstaculos = new QLabel("Obstáculos destruidos: 0", m_contenedorResultado);
+    m_lblObstaculos->setAlignment(Qt::AlignCenter);
+    m_lblObstaculos->setStyleSheet(estiloEstadistica);
+
+    m_lblVida = new QLabel("Vida final: 0 / 4", m_contenedorResultado);
+    m_lblVida->setAlignment(Qt::AlignCenter);
+    m_lblVida->setStyleSheet(estiloEstadistica);
+
+    // Botones
+    QString estiloBoton =
+        "QPushButton {"
+        "    background-color: rgba(70, 80, 100, 200);"
+        "    color: white;"
+        "    font-size: 18px;"
+        "    font-weight: bold;"
+        "    border: 2px solid rgba(255, 255, 255, 100);"
+        "    border-radius: 8px;"
+        "    padding: 15px 30px;"
+        "    min-width: 180px;"
+        "}"
+        "QPushButton:hover {"
+        "    background-color: rgba(90, 100, 120, 220);"
+        "    border: 2px solid rgba(255, 255, 255, 150);"
+        "}"
+        "QPushButton:pressed {"
+        "    background-color: rgba(60, 70, 90, 200);"
+        "}";
+
+    m_btnReintentar = new QPushButton("Reintentar", m_contenedorResultado);
+    m_btnReintentar->setStyleSheet(estiloBoton);
+    m_btnReintentar->setCursor(Qt::PointingHandCursor);
+
+    m_btnMenu = new QPushButton("Volver al Menú", m_contenedorResultado);
+    m_btnMenu->setStyleSheet(estiloBoton);
+    m_btnMenu->setCursor(Qt::PointingHandCursor);
+
+    // Botones
+    QHBoxLayout *layoutBotones = new QHBoxLayout();
+    layoutBotones->setSpacing(20);
+    layoutBotones->addStretch();
+    layoutBotones->addWidget(m_btnReintentar);
+    layoutBotones->addWidget(m_btnMenu);
+    layoutBotones->addStretch();
+
+    // Ensamblar
+    layoutPrincipal->addWidget(m_lblTitulo);
+    layoutPrincipal->addSpacing(20);
+    layoutPrincipal->addWidget(m_lblTiempo);
+    layoutPrincipal->addWidget(m_lblObstaculos);
+    layoutPrincipal->addWidget(m_lblVida);
+    layoutPrincipal->addStretch();
+    layoutPrincipal->addLayout(layoutBotones);
+
+    // Conectar botones
+    connect(m_btnReintentar, &QPushButton::clicked, this, [this]() {
+        ocultarOverlay();
+        reiniciarNivel();
+    });
+
+    connect(m_btnMenu, &QPushButton::clicked, this, [this]() {
+        ocultarOverlay();
+        emit volverAlMenu();
+    });
+}
+
+void NivelIso::mostrarOverlay(bool esVictoria)
+{
+    qreal tiempoSobrevivido = m_tiempoTranscurrido / 60.0;
+    qreal tiempoTotal = m_tiempoParaGanar / 60.0;
+
+    // Configurar título según resultado
+    if (esVictoria) {
+        m_lblTitulo->setText("¡VICTORIA!");
+        m_lblTitulo->setStyleSheet(
+            "QLabel {"
+            "    color: #4FFFB0;"
+            "    font-size: 48px;"
+            "    font-weight: bold;"
+            "    border: none;"
+            "    background: transparent;"
+            "}"
+            );
+    } else {
+        m_lblTitulo->setText("DERROTA");
+        m_lblTitulo->setStyleSheet(
+            "QLabel {"
+            "    color: #FF4F5B;"
+            "    font-size: 48px;"
+            "    font-weight: bold;"
+            "    border: none;"
+            "    background: transparent;"
+            "}"
+            );
+    }
+
+    // Actualizar estadísticas
+    if (esVictoria) {
+        m_lblTiempo->setText(QString("Tiempo sobrevivido: %1s / %2s")
+                                 .arg(tiempoSobrevivido, 0, 'f', 1)
+                                 .arg(tiempoTotal, 0, 'f', 1));
+
+        m_lblObstaculos->setText(QString("Obstáculos destruidos: %1")
+                                     .arg(m_obstaculosDestruidos));
+
+        m_lblVida->setText(QString("Vida final: %1 / %2")
+                               .arg(m_vidas)
+                               .arg(m_vidasMaximas));
+    } else {
+        qreal tiempoRestante = tiempoTotal - tiempoSobrevivido;
+
+        m_lblTiempo->setText(QString("Tiempo sobrevivido: %1s")
+                                 .arg(tiempoSobrevivido, 0, 'f', 1));
+
+        m_lblObstaculos->setText(QString("Te faltaban: %1s")
+                                     .arg(tiempoRestante, 0, 'f', 1));
+
+        m_lblVida->setText(QString("Obstáculos destruidos: %1")
+                               .arg(m_obstaculosDestruidos));
+    }
+
+    // Ventana cubre todo
+    m_widgetOverlay->setGeometry(0, 0, width(), height());
+
+    // Centrar contenedor
+    int x = (width() - m_contenedorResultado->width()) / 2;
+    int y = (height() - m_contenedorResultado->height()) / 2;
+    m_contenedorResultado->move(x, y);
+
+    // Mostrar y traer al frente
+    m_widgetOverlay->show();
+    m_widgetOverlay->raise();
+}
+
+void NivelIso::ocultarOverlay()
+{
+    m_widgetOverlay->hide();
 }
 
 
