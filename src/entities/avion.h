@@ -13,7 +13,7 @@ public:
     ~Avion();
     int getCreados() const;
     bool esJugador() const override;
-    void Disparar();
+    void Disparar(bool Modo);
     short int getCantMunicion();
     Misil* obtenerDisparo(short int posicion);
     std::vector<Misil*>& getmunicion();
@@ -30,6 +30,8 @@ public:
     void setderribados(short int newnumero);
     short int getderribados() const;
     void setCreados(short int valor);
+    void setDanhocausado();
+    short int getDanhocausado() const;
 
     //Colisiones y Físicas
     bool Planes_colision(Avion* jugador);
@@ -46,6 +48,7 @@ public:
 
 private:
     bool Dispara = true;
+    short int Danhocausado = 0;
     short int DanioInfligido = 0;
     bool Desplazar = true;
     short int CantMunicion = 0;

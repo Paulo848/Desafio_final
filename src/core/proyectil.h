@@ -50,7 +50,6 @@ public:
     inline int getDaño(){
         return daño;
     }
-
 };
 
 #endif

@@ -134,20 +134,11 @@ void Nivel_1::actualizarJuego()
     }
     if ((((IA -> Generarnewround() && !HayIA) && (!generarEnemigos() && enemigos.size() <= 1)) || (HayIA && IA -> GenerarnuevaOleada()))){
         qDebug() << derribados;
-        OleadasSuperadas++;
         generarIA();
     }
 
     connect(tiempodisparos, &QTimer::timeout, this, &Nivel_1::DisparosEnemigosAuto);
     tiempodisparos -> start(850);
-
-    // 3. Verificar condiciones de victoria/
-    if (jugador -> getVida() == 0 || !IA -> Generarnewround()){
-        tiempodisparos -> stop();
-        timer1 -> stop();
-        timer -> stop();
-        MostrarResultadosdeJuego();
-    }
 }
 
 bool Nivel_1::actualizarIA()
@@ -176,12 +167,15 @@ void Nivel_1::manejarColisiones(Avion* ente)
     if (!ente -> muerto){
         if (!(ente -> Planes_colision(jugador))){
             for (auto balasreceptor : ente -> getmunicion()){
-                //Corregir Colisiones entre misiles.
                 if (!balasreceptor -> muerto){
                     balasreceptor -> Colision_Avion();
                     if (ente -> muerto) {
                         jugador -> setderribados(jugador -> getderribados()+1);
                         break;
+                    } else {
+                        for (auto balasjugador : jugador -> getmunicion()){
+                            balasjugador -> Colision_Balas(balasreceptor);
+                        }
                     }
                 }
             }
@@ -192,6 +186,11 @@ void Nivel_1::manejarColisiones(Avion* ente)
 void Nivel_1::keyPressEvent(QKeyEvent *event)
 {
     // Manejar controles del jugador
+    if (HayIA){
+        jugador -> setVelocidad(3);
+    } else {
+        jugador -> setVelocidad(5);
+    }
     switch(event->key()) {
     case Qt::Key_W:
     case Qt::Key_Up:
@@ -206,16 +205,23 @@ void Nivel_1::keyPressEvent(QKeyEvent *event)
     case Qt::Key_A:
     case Qt::Key_Left:
         // Mover izquierda
-        jugador -> Mov_izquierda();
+        if (!HayIA)jugador -> Mov_izquierda();
         break;
     case Qt::Key_D:
     case Qt::Key_Right:
         // Mover derecha
-        jugador -> Mov_derecha();
+        if (!HayIA)jugador -> Mov_derecha();
+        break;
+    case Qt::Key_E:
+    case Qt::Key_N:
+        //Disparo Parabólico
+        jugador->Disparar(true);
+        escena -> addItem(jugador -> obtenerDisparo(jugador -> getCantMunicion()));
+        jugador -> setCantmunicion(1);
         break;
     case Qt::Key_Space:
         // Disparar
-        jugador->Disparar();
+        jugador->Disparar(false);
         escena -> addItem(jugador -> obtenerDisparo(jugador -> getCantMunicion()));
         jugador -> setCantmunicion(1);
         break;
@@ -253,8 +259,6 @@ void Nivel_1::update()
             }
         }
 
-        manejarColisiones(e);
-
         for (auto ite = e -> getmunicion().begin(); ite != e -> getmunicion().end(); ite++){
             Misil* misil = *ite;
             if (misil != nullptr){
@@ -265,6 +269,8 @@ void Nivel_1::update()
                 }
             }
         }
+
+        manejarColisiones(e);
 
         if (e -> estaMuerto()){
             escena->removeItem(e);
@@ -289,6 +295,13 @@ void Nivel_1::update()
     if (foto2->x() + width < 0){
         foto2->setX(foto1->x() + width);
     }
+
+    if (jugador -> muerto || !IA -> Generarnewround()){
+        tiempodisparos -> stop();
+        timer1 -> stop();
+        timer -> stop();
+        MostrarResultadosdeJuego();
+    }
 }
 
 void Nivel_1::DisparosEnemigosAuto(){
@@ -299,7 +312,7 @@ void Nivel_1::DisparosEnemigosAuto(){
             if (!avion -> esJugador()){
                 if (!avion -> getrecargar()){
                     if (std::abs(jugador -> pos().y() - avion -> pos().y()) < limit && std::abs(jugador -> pos().x() - avion -> pos().x()) < 900){
-                        avion -> Disparar();
+                        avion -> Disparar(false);
                         escena -> addItem(avion -> obtenerDisparo(avion -> getCantMunicion()));
                         avion -> setCantmunicion(1);
                     }
@@ -324,12 +337,15 @@ void Nivel_1::generarIA(){
     qDebug() << "IA agregada a vector de enemigos.";
 
     if (IA -> getOleadaActual() > 1){
+        OleadasSuperadas++;
         IA -> actualizar();
         qDebug() << "IA reposicionada.";
     }
 
+    TotalOleadas++;
+
     if (IA -> rondaCompletada()){
-        TotalOleadas += IA -> getCantOleadas();
+        OleadasSuperadas++;
         RondasSuperadas++;
         qDebug() << "Enemigos IA Eliminados.";
         IA -> setRondas();
@@ -348,14 +364,24 @@ bool Nivel_1::generarEnemigos(){
 
 void Nivel_1::MostrarResultadosdeJuego()
 {
-    // ================== EVALUAR OBJETIVOS ==================
+    QColor colorOscuro(0, 0, 0, 150); // Negro con 150/255 de opacidad (~60% opaco)
+
+    // Obtener los límites visibles de la escena
+    QRectF sceneRect = QRectF(0, -400, 1600, 1500); // Asumiendo que Nivel_1 es la escena o la conoce
+
+    // Crear y añadir el rectángulo oscuro que cubre la escena
+    QGraphicsRectItem* darkener = new QGraphicsRectItem(sceneRect);
+    darkener -> setBrush(QBrush(colorOscuro));
+    darkener -> setZValue(999); // Asegura que esté por encima de todos los elementos del nivel
+    escena -> addItem(darkener);
+    // ================== EVALUAR OBJETIVOS (SE MANTIENE IGUAL) ==================
     int objetivosCumplidos = 0;
     short int LimiteEnemigos = jugador->getCreados() * 0.3;
-    int LimiteDanio = jugador -> getderribados() * 400; // Ajusta según tu juego
+    int LimiteDanio = jugador->getderribados() * 400; // Ajusta según tu juego
 
     bool sobrevivir = !jugador->muerto;
     bool eliminarEnemigos = jugador->getderribados() >= LimiteEnemigos;
-    bool generarDanio = jugador->getDanioInfligido() >= LimiteDanio;
+    bool generarDanio = jugador->getDanioInfligido() > LimiteDanio;
 
     if (sobrevivir) objetivosCumplidos++;
     if (eliminarEnemigos) objetivosCumplidos++;
@@ -363,122 +389,164 @@ void Nivel_1::MostrarResultadosdeJuego()
 
     bool gano = (objetivosCumplidos >= 3); // Ajusta según tus reglas
 
+    // Se mantiene esta variable aunque no se use en el layout final, por si la necesitas
     int porcentajeEnemigos = 0;
     if (LimiteEnemigos > 0) {
         porcentajeEnemigos = (jugador->getderribados() * 100) / LimiteEnemigos;
         if (porcentajeEnemigos > 100) porcentajeEnemigos = 100;
     }
 
-    // ================== DIALOGO ==================
+    // ================== DIALOGO (ESTILO VISUAL MODIFICADO) ==================
     QDialog dialog(this);
     dialog.setWindowTitle("Resultados del nivel");
     dialog.setModal(true);
-    dialog.setFixedSize(400, 360); // tamaño más compacto
+    // Tamaño ajustado para que quepa todo el contenido original con el estilo oscuro
+    dialog.setFixedSize(450, 480);
+
+    // Aplicación de estilo oscuro para el diálogo y sus widgets
+    dialog.setStyleSheet(
+        "QDialog { "
+        "background-color: #1a1a1a; " // Fondo de la ventana oscuro
+        "border: 1px solid #333333; " // Borde sutil
+        "border-radius: 8px; "
+        "} "
+        "QLabel, QCheckBox { color: #E0E0E0; } " // Texto blanco/gris claro para todo el contenido
+        "QCheckBox::indicator { width: 14px; height: 14px; } "
+        // Estilo para las líneas divisorias
+        "QFrame[frameShape=\"4\"] { background-color: #555555; height: 1px; }"
+        "QPushButton { "
+        "background-color: #333333; " // Botones oscuros
+        "color: #FFFFFF; "
+        "border: 1px solid #555555; "
+        "border-radius: 5px; "
+        "padding: 10px 25px; " // Botones grandes, estilo de la imagen
+        "font-weight: bold; "
+        "} "
+        "QPushButton:hover { background-color: #444444; } "
+        );
 
     QVBoxLayout* layout = new QVBoxLayout(&dialog);
-    layout->setContentsMargins(10, 10, 10, 10);
-    layout->setSpacing(6); // espacio reducido
+    layout->setContentsMargins(20, 20, 20, 20);
+    layout->setSpacing(5);
 
-    // ================== TITULO ==================
+    // ================== TITULO (CONTENIDO ORIGINAL RESTAURADO) ==================
     QLabel* titulo = new QLabel(gano ? "🏆 NIVEL SUPERADO" : "💀 MISIÓN FALLIDA");
     titulo->setAlignment(Qt::AlignCenter);
     QFont f = titulo->font();
-    f.setPointSize(16); // fuente más pequeña
+    f.setPointSize(22); // Tamaño grande para el título
     f.setBold(true);
     titulo->setFont(f);
-    titulo->setStyleSheet(gano ? "color: gold;" : "color: red;");
+    // Mantiene colores originales (gold/red) pero sobre un bloque negro para el contraste
+    titulo->setStyleSheet(
+        gano ? "color: gold; background-color: #000000; padding: 10px 0; margin: 0;"
+             : "color: red; background-color: #000000; padding: 10px 0; margin: 0;"
+    );
 
-    // ================== FUNCION LINEA ==================
+    // ================== FUNCION LINEA (CONTENIDO ORIGINAL RESTAURADO) ==================
     auto crearLinea = []() {
         QFrame* linea = new QFrame();
         linea->setFrameShape(QFrame::HLine);
-        linea->setFrameShadow(QFrame::Sunken);
-        linea->setStyleSheet("color:#777;");
+        linea->setFrameShadow(QFrame::Plain);
+        linea->setStyleSheet("background-color: #333333; height: 1px;");
         linea->setFixedHeight(2);
         return linea;
     };
 
-    // ================== RESUMEN ==================
+    // ================== RESUMEN (CONTENIDO ORIGINAL RESTAURADO) ==================
     QLabel* lblResumenTitulo = new QLabel("📊 Resumen");
-    lblResumenTitulo->setStyleSheet("font-weight:bold; font-size: 12px;");
+    lblResumenTitulo->setStyleSheet("font-weight:bold; font-size: 14px; color: #CCCCCC; margin-top: 10px;");
 
     QLabel* resumen = new QLabel(QString("Objetivos cumplidos: %1 / 3").arg(objetivosCumplidos));
     resumen->setAlignment(Qt::AlignCenter);
 
-    // ================== MISIONES ==================
+    // ================== MISIONES (CONTENIDO ORIGINAL RESTAURADO) ==================
     QLabel* lblMisionesTitulo = new QLabel("🎯 Misiones");
-    lblMisionesTitulo->setStyleSheet("font-weight:bold; font-size: 12px;");
+    lblMisionesTitulo->setStyleSheet("font-weight:bold; font-size: 14px; color: #CCCCCC; margin-top: 10px;");
 
     QCheckBox* cbSobrevivir = new QCheckBox("Sobrevivir el nivel");
     cbSobrevivir->setChecked(sobrevivir);
     cbSobrevivir->setEnabled(false);
-    cbSobrevivir->setStyleSheet(sobrevivir ? "color: green;" : "color: red;");
+    // Se mantienen los colores originales de estado
+    cbSobrevivir->setStyleSheet(sobrevivir ? "color: #00C853;" : "color: #FF5252;");
 
     QCheckBox* cbEliminar = new QCheckBox(
         QString("Eliminar enemigos (%1 / %2)").arg(jugador->getderribados()).arg(LimiteEnemigos)
         );
     cbEliminar->setChecked(eliminarEnemigos);
     cbEliminar->setEnabled(false);
-    cbEliminar->setStyleSheet(eliminarEnemigos ? "color: green;" : "color: red;");
+    cbEliminar->setStyleSheet(eliminarEnemigos ? "color: #00C853;" : "color: #FF5252;");
 
     QCheckBox* cbDanio = new QCheckBox(
         QString("Generar el mayor daño posible (%1 / %2)").arg(jugador->getDanioInfligido()).arg(LimiteDanio)
-        );
+    );
     cbDanio->setChecked(generarDanio);
     cbDanio->setEnabled(false);
-    cbDanio->setStyleSheet(generarDanio ? "color: green;" : "color: red;");
+    cbDanio->setStyleSheet(generarDanio ? "color: #00C853;" : "color: #FF5252;");
 
-    // ================== PROGRESO DEL NIVEL ==================
+    // ================== PROGRESO DEL NIVEL (CONTENIDO ORIGINAL RESTAURADO) ==================
     QLabel* lblProgresoTitulo = new QLabel("⏱ Progreso del nivel");
-    lblProgresoTitulo->setStyleSheet("font-weight: bold; font-size: 12px;");
+    lblProgresoTitulo->setStyleSheet("font-weight: bold; font-size: 14px; color: #CCCCCC; margin-top: 10px;");
 
     QLabel* lblRondas = new QLabel(
         QString("Rondas sobrevividas: %1 / %2").arg(RondasSuperadas).arg(IA->getTotalRondas())
-        );
+    );
 
     QLabel* lblOleadas = new QLabel(
         QString("Oleadas superadas: %1 / %2").arg(OleadasSuperadas).arg(TotalOleadas)
-        );
+    );
 
-    // ================== BOTONES ==================
+    // ================== BOTONES (CONTENIDO ORIGINAL RESTAURADO, ESTILO VISUAL MODIFICADO) ==================
     QPushButton* btnReintentar = new QPushButton("Reintentar");
-    QPushButton* btnSalir = new QPushButton("Salir al menú");
+    QPushButton* btnSalir = new QPushButton("Salir al menú"); // Se mantiene el texto original
 
     QHBoxLayout* botones = new QHBoxLayout();
-    botones->addStretch();
+    botones->addStretch(); // Para centrar los botones
     botones->addWidget(btnReintentar);
     botones->addWidget(btnSalir);
+    botones->addStretch();
 
-    // ================== ARMAR LAYOUT ==================
+    // ================== ARMAR LAYOUT (CON TODA LA ESTRUCTURA ORIGINAL) ==================
     layout->addWidget(titulo);
-    layout->addSpacing(6);
+    layout->addSpacing(10);
 
+    // RESUMEN
     layout->addWidget(lblResumenTitulo);
     layout->addWidget(crearLinea());
     layout->addWidget(resumen);
-    layout->addSpacing(6);
+    layout->addSpacing(8);
 
+    // MISIONES
     layout->addWidget(lblMisionesTitulo);
     layout->addWidget(crearLinea());
     layout->addWidget(cbSobrevivir);
     layout->addWidget(cbEliminar);
     layout->addWidget(cbDanio);
-    layout->addSpacing(6);
+    layout->addSpacing(8);
 
+    // PROGRESO
     layout->addWidget(lblProgresoTitulo);
     layout->addWidget(crearLinea());
     layout->addWidget(lblRondas);
     layout->addWidget(lblOleadas);
 
-    layout->addStretch();
+    layout->addStretch(); // Empuja los botones hacia abajo
     layout->addLayout(botones);
 
-    // ================== CONEXIONES ==================
+
+    // ================== CONEXIONES Y DECISIÓN ==================
     connect(btnReintentar, &QPushButton::clicked, &dialog, &QDialog::accept);
     connect(btnSalir, &QPushButton::clicked, &dialog, &QDialog::reject);
 
-    // ================== DECISIÓN ==================
-    if (dialog.exec() == QDialog::Accepted) {
+    int result = dialog.exec();
+
+       // 3. Eliminar la capa oscura después de cerrar el diálogo
+    if (darkener) {
+        escena->removeItem(darkener);
+        delete darkener;
+        darkener = nullptr;
+    }
+
+    if (result == QDialog::Accepted) {
         reiniciarNivel();
     } else {
         emit volverAlMenu();

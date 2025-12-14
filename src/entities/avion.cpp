@@ -102,13 +102,18 @@ bool Avion::esJugador() const{
     return jugador;
 }
 
-void Avion::Disparar(){
-    if (jugador){
-        Vector2D direccionbala(1.0, 0.0);
-        municion.push_back(new Misil(this, direccionbala));
+void Avion::Disparar(bool Modo){
+    if (!Modo){
+        if (jugador){
+            Vector2D direccionbala(1.0, 0.0);
+            municion.push_back(new Misil(this, direccionbala));
+        } else {
+            Vector2D direccionbala(-1.0, 0.0);
+            municion.push_back(new Misil(this, direccionbala));
+        }
     } else {
-        Vector2D direccionbala(-1.0, 0.0);
-        municion.push_back(new Misil(this, direccionbala));
+        Vector2D direccionbala(1.0, 1.0);
+        municion.push_back(new Misil(this, direccionbala.normalizado()));
     }
 }
 
@@ -128,16 +133,18 @@ short int Avion::getCantMunicion(){
 
 bool Avion::Planes_colision(Avion* entidad){
     if (this->collidesWithItem(entidad) && (esJugador() != entidad -> esJugador())){
-        if (!jugador && Dispara){
+        if (!jugador){
             vida -= 400;
-        } else {
-            /*if (vida - 500 < 0){
-                vida = 0;
-            } else {
-                vida -= 500;
-            }*/
+            entidad -> setVida(entidad -> getVida() - 500);
+            entidad -> setDanioInfligido(400);
+            if (entidad -> getVida() <= 0){
+                entidad -> setVida(0);
+                entidad -> muerto = true;
+            }
         }
+
         if (vida <= 0){
+            vida = 0;
             muerto = true;
             if (Dispara){
                 entidad -> setderribados(entidad -> getderribados() + 1);
@@ -178,6 +185,10 @@ void Avion::recibirImpacto(Proyectil* p){
     if (vida <= 0){
         vida = 0;
         muerto = true;
+        if (p -> esDeJugador()){
+            Avion* jugador = dynamic_cast<Avion*>(p -> getemisor());
+            jugador -> setderribados(jugador -> getderribados() + 1);
+        }
     }
 }
 
@@ -192,11 +203,6 @@ void Avion::actualizarelementos(){
             disparadas++;
         }
     }
-    /*if (municion.size() == 0){
-        QTimer::singleShot(4000, [this](){
-            this -> setrecargar(false);
-        });
-    }*/
 }
 
 Avion::~Avion(){

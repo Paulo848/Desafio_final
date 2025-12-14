@@ -52,13 +52,13 @@ void OleadaAt_Colectivo::Generarenemigos(){
         }
         if (crear){
             if (OleadaActual == 0){
-                grupo.push_back(new Avion(false, 1495, posy));
+                grupo.push_back(new Avion(false, 1480, posy));
                 grupo[cont] -> setVelocidad(20);
                 grupo[cont] -> setVida(5000);
                 Avion* enemyIA = dynamic_cast<Avion*>(grupo[cont]);
                 enemyIA -> setCreados(-1);
             } else {
-                grupo[cont] -> setPos(1495, posy);
+                grupo[cont] -> setPos(1480, posy);
                 grupo[cont] -> muerto = false;
             }
             cont++;

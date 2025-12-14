@@ -20,6 +20,9 @@ public:
     bool esDeJugador() const override;
     void aplicarImpacto(FuerzaArmada* obj) override;
     void Colision_Avion();
+    void setDireccionCaida();
+    void setdañoAplicado(bool estado);
+    void Colision_Balas(Misil* other);
 
     void paint(QPainter *painter,
                        const QStyleOptionGraphicsItem *option,
@@ -28,8 +31,10 @@ public:
     bool operator!=(Misil* other);
 
 private:
+    bool dañoAplicado = false;
+    qreal largo;
+    qreal ancho;
     QPixmap sprite;
-    void Colision_Balas(Misil* other);
 };
 
 #endif // MISIL_H
