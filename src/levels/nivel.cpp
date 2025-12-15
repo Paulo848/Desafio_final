@@ -172,7 +172,7 @@ void Nivel::cargarFondo()
 {
     // Fondo del nivel
     QPixmap imagenFondo(QCoreApplication::applicationDirPath()
-                        + "/../../assets/nivel_3/fondo_nivel_3.png");
+                        + "/../../../assets/nivel_3/fondo_nivel_3.png");
     fondoSize.set(imagenFondo.width(), imagenFondo.height());
 
     fondoScroll = new QGraphicsPixmapItem(imagenFondo);

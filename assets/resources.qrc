@@ -3,6 +3,7 @@
         <file>assets/audio/sonido_de_disparo.wav</file>
         <file>assets/audio/sonido_de_explosion.wav</file>
         <file>assets/audio/Guerra-Efectos-de-sonido.wav</file>
-	<file>assets/audio/musica_nivel.wav</file>
+	<file>assets/audio/musica_nivel1.wav</file>
+	<file>assets/audio/musica_menu.wav</file>
     </qresource>
 </RCC>

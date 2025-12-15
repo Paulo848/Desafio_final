@@ -7,6 +7,12 @@
 #include <QSoundEffect>
 #include <QTimer>
 #include <QPixmap>
+#include <QVBoxLayout>
+#include <QHBoxLayout>
+#include <QLabel>
+#include <QPropertyAnimation>
+#include <QGraphicsOpacityEffect>
+#include <QPushButton>
 #include "barco.h"
 #include "obstaculon2.h"
 #include "torpedo.h"
@@ -108,6 +114,24 @@ private:
 
     QPixmap m_spriteBarco;
     QPixmap m_spriteTorpedo;
+    QPixmap m_spriteMapaIso;
+
+    // Decoracion menu
+    void crearOverlayResultado();
+    void mostrarOverlay(bool esVictoria);
+    void ocultarOverlay();
+    QPointF m_barcoPosPrevio;
+
+    QWidget *m_widgetOverlay;
+    QWidget *m_contenedorResultado;
+    QLabel *m_lblTitulo;
+    QLabel *m_lblTiempo;
+    QLabel *m_lblObstaculos;
+    QLabel *m_lblVida;
+    QPushButton *m_btnReintentar;
+    QPushButton *m_btnMenu;
+    int m_obstaculosDestruidos;
+
 };
 
 #endif // NIVELISO_H
