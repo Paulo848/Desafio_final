@@ -19,6 +19,10 @@
 #include <cstdlib>
 #include <QCheckBox>
 #include <QProgressBar>
+#include <QDir>
+#include <QCoreApplication>
+#include <QFile>
+#include <QSoundEffect>
 
 class Participantes;
 class Obstaculo;
@@ -44,6 +48,7 @@ private slots:
     void onVolverClicked();
     void update();
     void DisparosEnemigosAuto();
+    void onSonidoAmbienteTerminado();
 
 private:
     // Número del nivel
@@ -85,6 +90,11 @@ private:
     void actualizarHUD();
     void inicializarEscena();
     void cargarElementosNivel();
+
+    // Sonido
+    QSoundEffect *m_sonidoAmbiente;
+    void cargarSonidos();
+    void cargarSonidosDesdeArchivos();
 
     // Lógica del juego
     short int OleadasSuperadas = 0;

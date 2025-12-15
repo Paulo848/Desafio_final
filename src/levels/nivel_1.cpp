@@ -8,12 +8,14 @@ Nivel_1::Nivel_1(int numeroNivel, QWidget *parent)
     numNivel(numeroNivel),
     jugador(nullptr),
     speed(2),
-    IA(new OleadaAt_Colectivo())
+    IA(new OleadaAt_Colectivo()),
+    m_sonidoAmbiente(nullptr)
 {
     inicializarUI();
     inicializarEscena();
     cargarElementosNivel();
     inicializarHUD();
+    cargarSonidos();
 
     // Iniciar bucle juego
     timer = new QTimer(this);
@@ -24,6 +26,13 @@ Nivel_1::Nivel_1(int numeroNivel, QWidget *parent)
 Nivel_1::~Nivel_1()
 {
     timer->stop();
+
+    // Limpia sonidos
+    if (m_sonidoAmbiente) {
+        m_sonidoAmbiente->stop();
+        delete m_sonidoAmbiente;
+        m_sonidoAmbiente = nullptr;
+    }
 
     // Limpiar
     if (jugador) delete jugador;
@@ -239,6 +248,13 @@ void Nivel_1::keyReleaseEvent(QKeyEvent *event)
 void Nivel_1::onVolverClicked()
 {
     timer->stop(); // Detener el juego
+
+    // Detener música del nivel y desconectar señal
+    if (m_sonidoAmbiente) {
+        disconnect(m_sonidoAmbiente, &QSoundEffect::playingChanged,
+                   this, &Nivel_1::onSonidoAmbienteTerminado);
+        m_sonidoAmbiente->stop();
+    }
     emit volverAlMenu();
 }
 
@@ -364,6 +380,13 @@ bool Nivel_1::generarEnemigos(){
 
 void Nivel_1::MostrarResultadosdeJuego()
 {
+    // Detener musica
+    if (m_sonidoAmbiente) {
+        disconnect(m_sonidoAmbiente, &QSoundEffect::playingChanged,
+                   this, &Nivel_1::onSonidoAmbienteTerminado);
+        m_sonidoAmbiente->stop();
+    }
+
     QColor colorOscuro(0, 0, 0, 150); // Negro con 150/255 de opacidad (~60% opaco)
 
     // Obtener los límites visibles de la escena
@@ -565,6 +588,15 @@ void Nivel_1::reiniciarNivel(){
     inicializarEscena();
     cargarElementosNivel();
 
+    // Reactivar musica
+    if (m_sonidoAmbiente) {
+        connect(m_sonidoAmbiente, &QSoundEffect::playingChanged,
+                this, &Nivel_1::onSonidoAmbienteTerminado);
+        if (!m_sonidoAmbiente->isPlaying()) {
+            m_sonidoAmbiente->play();
+        }
+    }
+
     // Reactivar timers
     timer->start();
     timer1->start();
@@ -725,4 +757,68 @@ void Nivel_1::actualizarHUD() {
     // Daño infligido
     // Nota: Es crucial que 'jugador->getDanioInfligido()' sea el valor actualizado
     lblDanio->setText(QString("Daño: %1").arg(jugador->getDanioInfligido()));
+}
+
+// Sistema de sonido
+void Nivel_1::cargarSonidos()
+{
+    cargarSonidosDesdeArchivos();
+}
+
+void Nivel_1::cargarSonidosDesdeArchivos()
+{
+    QString rutaBase = QCoreApplication::applicationDirPath();
+
+    // Buscar carpeta de assets en rutas posibles
+    QStringList posiblesRutas = {
+        rutaBase + "/../../../assets/audio",
+    };
+
+    QString rutaEncontrada;
+    for (const QString &ruta : posiblesRutas) {
+        QString rutaLimpia = QDir::cleanPath(ruta);
+        if (QDir(rutaLimpia).exists()) {
+            QDir dir(rutaLimpia);
+            QStringList archivos = dir.entryList(QDir::Files);
+            if (!archivos.isEmpty()) {
+                rutaEncontrada = rutaLimpia;
+                break;
+            }
+        }
+    }
+
+    if (rutaEncontrada.isEmpty()) {
+        return;
+    }
+
+    // Cargar sonido de ambiente de guerra
+    QString rutaAmbiente = rutaEncontrada + "/musica_nivel1.wav";
+    m_sonidoAmbiente = new QSoundEffect(this);
+
+    if (QFile::exists(rutaAmbiente)) {
+        m_sonidoAmbiente->setSource(QUrl::fromLocalFile(rutaAmbiente));
+        m_sonidoAmbiente->setVolume(0.1f);
+        m_sonidoAmbiente->setLoopCount(1);  // Solo una reproducción por vez
+
+        // Conectar señal para reproducir en loop cuando termine
+        connect(m_sonidoAmbiente, &QSoundEffect::playingChanged,
+                this, &Nivel_1::onSonidoAmbienteTerminado);
+
+        // Iniciar reproducción
+        m_sonidoAmbiente->play();
+
+    } else {
+        delete m_sonidoAmbiente;
+        m_sonidoAmbiente = nullptr;
+    }
+}
+
+void Nivel_1::onSonidoAmbienteTerminado()
+{
+    // Este slot se llama cada vez que cambia el estado de reproducción
+    if (m_sonidoAmbiente && !m_sonidoAmbiente->isPlaying()) {
+        // Si el sonido terminó de reproducirse, reproducirlo nuevamente
+        // (esto crea un loop continuo)
+        m_sonidoAmbiente->play();
+    }
 }
