@@ -74,6 +74,8 @@ public:
     inline QGraphicsScene*      getEscena()      const { return escena; }
     inline Vector2D             getfondoSize()   const { return fondoSize; }
     Vector2D                    getJugDir()      const;
+    Vector2D                    getCamara()      const { return camara; }
+    Vector2D                    getViewportSize()      const { return viewportSize; }
 
     inline void registrarEnemigo(Cadete *e) { if (e) enemigos.push_back(e); }
     inline void registrarAgente(Agente *a)  { if (a) agentes.push_back(a); }

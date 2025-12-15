@@ -1,8 +1,6 @@
 <RCC>
     <qresource prefix="/ui">
-        <file>ui/Fondo_Nivel_3.png</file>
         <file>ui/Fondo1.png</file>
-        <file>nivel_3/fondo_nivel_3.png</file>
     </qresource>
     <qresource prefix="/obs">
         <file>nivel_3/Piedra_3.png</file>
@@ -35,5 +33,9 @@
         <file>nivel_2/obs_1.png</file>
         <file>nivel_2/barco.png</file>
         <file>nivel_2/torpedo.png</file>
+    </qresource>
+    <qresource prefix="/cadete">
+        <file>nivel_3/Cadete_2.png</file>
+        <file>nivel_3/Cadete_1.png</file>
     </qresource>
 </RCC>

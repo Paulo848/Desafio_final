@@ -18,16 +18,41 @@ Cadete::Cadete(qreal r, qreal x, qreal y, bool esJugador, qreal vida)
     }
 }
 
-void Cadete::paint(QPainter *painter,
-                   const QStyleOptionGraphicsItem *,
-                   QWidget *)
+void Cadete::paint(QPainter *p, const QStyleOptionGraphicsItem *, QWidget *)
 {
-    // color distinto si es jugador o enemigo, por ejemplo
-    painter->setPen(Qt::NoPen);
-    painter->setBrush(jugador ? Qt::green : Qt::blue);
-    painter->drawEllipse(boundingRect());
+    if (!tieneSprite || sprite.isNull()) {
+        p->setPen(Qt::NoPen);
+        p->setBrush(jugador ? Qt::blue : Qt::green);
+        p->drawEllipse(FuerzaArmada::boundingRect());
+        return;
+    }
+
+    Vector2D d = getDireccion();
+    if (d.magnitud2() == 0.0) d = Vector2D(0, -1);
+
+    qreal angDeg = qRadiansToDegrees(qAtan2(d.y(), d.x()));
+    angDeg -= 90.0;
+
+    QRectF target = FuerzaArmada::boundingRect();
+
+    p->save();
+    p->setRenderHint(QPainter::SmoothPixmapTransform, false);
+
+    p->translate(0, 0);
+    p->rotate(angDeg);
+
+    p->drawPixmap(target, sprite, sprite.rect());
+
+    p->restore();
 }
 
+QRectF Cadete::boundingRect() const
+{
+    QRectF r = FuerzaArmada::boundingRect();
+
+    const qreal m = 6.0;
+    return r.adjusted(-m, -m, m, m);
+}
 
 void Cadete::definirMunicion(int cantidad, int maximo)
 {
@@ -89,7 +114,6 @@ void Cadete::recibirImpacto(Proyectil* p)
 {
     if (!p) return;
 
-    // Solo sufro daño si el proyectil viene del bando contrario
     const bool proyectilDeJugador = p->esDeJugador();
 
     if (proyectilDeJugador && !this->jugador) {
@@ -102,4 +126,18 @@ void Cadete::recibirImpacto(Proyectil* p)
 bool Cadete::esJugador() const
 {
     return jugador;
+}
+
+void Cadete::setSprite(const QString& path)
+{
+    QPixmap tmp(path);
+    if (!tmp.isNull()) {
+        sprite = tmp;
+        tieneSprite = true;
+        update();
+    } else {
+        tieneSprite = false;
+        sprite = QPixmap();
+        update();
+    }
 }

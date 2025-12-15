@@ -49,7 +49,8 @@
 Nivel::Nivel(int numeroNivel, QWidget *parent, qreal _v_alto, qreal _v_ancho)
     : QWidget(parent),
     numNivel(numeroNivel),
-    viewportSize(_v_ancho, _v_alto)
+    viewportSize(_v_ancho, _v_alto),
+    numColsChunks(NUMERO_COLUM_CHUNKS)
 {
     setupNivel();
 }
@@ -170,7 +171,8 @@ void Nivel::configurarFondoSegunNivel()
 void Nivel::cargarFondo()
 {
     // Fondo del nivel
-    QPixmap imagenFondo(":/ui/nivel_3/fondo_nivel_3.png");
+    QPixmap imagenFondo(QCoreApplication::applicationDirPath()
+                        + "/../../assets/nivel_3/fondo_nivel_3.png");
     fondoSize.set(imagenFondo.width(), imagenFondo.height());
 
     fondoScroll = new QGraphicsPixmapItem(imagenFondo);
@@ -465,7 +467,7 @@ Obstaculo* Nivel::crearObstaculoEnChunk(Chunk &chunk,
 
     // Ruta completa del sprite
     const QString spritePath =
-        QStringLiteral(":obs/nivel_3/%1.png").arg(spriteName);
+        QStringLiteral(":/obs/nivel_3/%1.png").arg(spriteName);
 
     // Por ahora: hitbox circular genérico, solo cambia el sprite
     Obstaculo *obs = new Obstaculo(30.0, spritePath);
@@ -486,7 +488,8 @@ void Nivel::setupEntidades()
 {
 
     // Jugador
-    jugador = new Cadete(15, 0.0, 0.0, true, 1000);
+    jugador = new Cadete(15, 0.0, 0.0, true, VIDA_JUGADOR);
+    jugador->setSprite(":/cadete/nivel_3/Cadete_1.png");
     jugador->setPos(0, 0);
     if (escena)
         escena->addItem(jugador);
@@ -870,9 +873,6 @@ void Nivel::actualizarOleadas()
     if (asegurarRondaCreada())
         return;
 
-    // 2) Activa grupos que correspondan a la ronda
-    activarGruposRondaActual();
-
     // 3) Avanza ronda si todos completaron
     avanzarRondaSiCompleta();
 
@@ -1090,18 +1090,6 @@ void Nivel::crearRonda3()
                      -M_PI * 0.2, M_PI * 0.2);
 }
 
-void Nivel::activarGruposRondaActual()
-{
-    // Activar grupos de la ronda actual con enemigos
-    for (Agente *a : agentes) {
-        if (!a) continue;
-        if (a->getRondaAsignada() != ronda_act) continue;
-        if (a->estaActivo())                    continue;
-        if (a->getEnemigosRestantes() <= 0)     continue;
-        a->setActivo(true);
-    }
-}
-
 void Nivel::avanzarRondaSiCompleta()
 {
     int gruposEnRonda    = 0;
@@ -1148,27 +1136,25 @@ void Nivel::actualizarRonda()
 
 void Nivel::actualizarRonda2()
 {
-    // ¿Algún flanqueo ya ataca?
-    bool hayFlanqueoAtacando = false;
+    bool hayAtaque = false;
 
     for (Agente *a : agentes) {
         if (!a) continue;
         if (a->getRondaAsignada() != 2)             continue;
         if (!a->estaActivo())                        continue;
-        if (a->getModo() != ModoGrupo::AtaqueDirecto)     continue;
+        if (a->getModo() != ModoGrupo::Campamento)     continue;
         if (a->getEnemigosRestantes() <= 0)          continue;
-        if (a->getEstado() == EstadoGrupo::Atacando) { hayFlanqueoAtacando = true; break; }
+        if (a->getEstado() == EstadoGrupo::Atacando) { hayAtaque = true; break; }
     }
 
-    // Poner modo Emboscada a todos los de ronda 2
-    if (hayFlanqueoAtacando) {
+    // Poner modo ataque a todos los de ronda 2
+    if (hayAtaque) {
         for (Agente *a : agentes) {
             if (!a) continue;
             if (a->getRondaAsignada() != 2)    continue;
             if (a->getEnemigosRestantes() <= 0) continue;
-            a->setModo(ModoGrupo::AtaqueDirecto);
+            a->setModo(ModoGrupo::Campamento);
             a->setEstado(EstadoGrupo::Atacando);
-            a->setActivo(true);
         }
     }
 }
@@ -1275,7 +1261,7 @@ void Nivel::actualizarRecargaJugador()
 void Nivel::actualizarHUD()
 {
     // -------- VIDA --------
-    int vidaMaxima = -1;
+    int vidaMaxima = VIDA_JUGADOR;
 
     if (!jugador) {
         barraVida->setRange(0, 1);
@@ -1662,7 +1648,9 @@ void Nivel::disparar(Cadete *emisor)
     QPointF posEnFondo = fondoScroll->mapFromScene(emisor->scenePos());
 
     // Crear bala
-    Bala *b = new Bala(emisor, emisor->getDireccion());
+
+    int d = emisor->esJugador() ? DANIO_BALA_JUGADOR : DANIO_BALA_ENEMIGO;
+    Bala *b = new Bala(emisor, emisor->getDireccion(), d);
     b->setParentItem(fondoScroll);
     b->setPos(posEnFondo);
 
@@ -1714,7 +1702,7 @@ OleadaCadetes* Nivel::encontrarAliadoMasCercanoEnRotacion(OleadaCadetes *petidor
     OleadaCadetes *mejor = nullptr;
     qreal mejorDist2 = std::numeric_limits<qreal>::max();
 
-    Vector2D centroPetidora = petidora->centroGrupoScene();
+    Vector2D centroPetidora = petidora->calcularCentroGrupoLocal();
 
     for (Agente *a : agentes) {
         if (!a) continue;
@@ -1725,11 +1713,9 @@ OleadaCadetes* Nivel::encontrarAliadoMasCercanoEnRotacion(OleadaCadetes *petidor
         if (g->getRondaAsignada() != 3) continue;
         if (g->getModo() != ModoGrupo::Rotacion) continue;
         if (g->getEnemigosRestantes() <= 0) continue;
-
-        // No queremos que el aliado también esté huyendo
         if (g->estaHuyendo()) continue;
 
-        Vector2D centroAliado = g->centroGrupoScene();
+        Vector2D centroAliado = g->calcularCentroGrupoLocal();
         qreal dist2 = (centroAliado - centroPetidora).magnitud2();
 
         if (dist2 < mejorDist2) {

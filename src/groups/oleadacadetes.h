@@ -27,10 +27,7 @@ public:
     // Marca que este grupo ha sido llamado por otra oleada para apoyar/atacar
     void marcarLlamadoPorOtraOleada();
 
-    // Centro del grupo en coordenadas de escena (para calcular distancias)
-    Vector2D centroGrupoScene() const;
-
-    void inicializarRondas(int total) override;
+    void inicializarRondas(int total) override {}
 
     // Spawn de una ronda alrededor del jugador
     void spawnRonda(int cantidad,
@@ -56,21 +53,13 @@ public:
     // Radio que activa el ataque cuando el jugador se acerca
     void setRadioActivacion(qreal r);
 
-    // Flags para que Nivel coordine rotación entre oleadas
-    inline bool estaPidiendoRefuerzo() const { return pidiendoRefuerzo; }
-    inline void limpiarPeticionRefuerzo()    { pidiendoRefuerzo = false; }
+    // Centro del grupo en coordenadas locales
+    Vector2D calcularCentroGrupoLocal() const;
 
 private:
     // ============================
     //  Estado interno Rotación
     // ============================
-
-    enum class EstadoRotacion {
-        EnCampamento,   // está en su posición de campamento
-        Atacando,       // presionando al jugador
-        Huyendo,        // retirándose a punto de retirada
-        EsperandoOrden  // ya recargada, esperando que Nivel la mande otra vez
-    };
 
     // --- Layout / posiciones ---
     std::vector<Vector2D> puntosCampamento;  // slots donde se ubican los cadetes
@@ -82,9 +71,6 @@ private:
     bool     accionDispararActiva = false;   // “tener disparar(true) en Cadete”
     Vector2D focoMovimiento;                 // destino (jugador, campamento, retirada)
 
-    // --- Estado de rotación / coordinación ---
-    EstadoRotacion estadoRotacion = EstadoRotacion::EnCampamento;
-    bool pidiendoRefuerzo         = false;   // esta oleada pide relevo
     bool llamadoPorOtraOleada     = false;   // esta oleada fue llamada para atacar
 
     // --- Cuantos cadetes del grupo tienen balas ---
@@ -132,7 +118,7 @@ private:
     // Dirección desde el cadete hasta focoMovimiento
     Vector2D calcularDireccionHaciaFoco(FuerzaArmada *e = nullptr) const;
     Vector2D calcularDireccionHaciaJugador(FuerzaArmada *e = nullptr) const;
-
+    Vector2D calcularPosJugador() const ;
     // Vector de separación para no montarse sobre otros cadetes
     Vector2D calcularSeparacion(FuerzaArmada *e) const;
 
@@ -149,9 +135,6 @@ private:
     //  Helpers de geometría / colisión
     // ============================
 
-    // Centro del grupo en coordenadas de escena
-    Vector2D calcularCentroGrupoScene() const;
-
     // Reacción al chocar con un obstáculo (igual a tu react_colision actual)
     Vector2D reaccionarColision(Obstaculo *obs,
                                 FuerzaArmada *cadet,
@@ -163,6 +146,8 @@ private:
 
     // Recuenta enemigos vivos/muertos y marca activo/Muerto
     void actualizarEstadoVivosYMuertos();
+
+    Vector2D calcularCentroCampamento();
 
 };
 
