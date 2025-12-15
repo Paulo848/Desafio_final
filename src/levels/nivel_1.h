@@ -35,6 +35,10 @@ class Nivel_1: public QWidget
 public:
     explicit Nivel_1(int numeroNivel, QWidget *parent = nullptr);
     ~Nivel_1();
+    bool m_moverizquierda = false;
+    bool m_moverarriba = false;
+    bool m_moverderecha = false;
+    bool m_moverabajo = false;
 
 signals:
     void volverAlMenu();

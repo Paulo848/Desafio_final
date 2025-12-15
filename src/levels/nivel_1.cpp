@@ -204,22 +204,22 @@ void Nivel_1::keyPressEvent(QKeyEvent *event)
     case Qt::Key_W:
     case Qt::Key_Up:
         // Mover arriba
-        jugador -> Mov_up();
+        m_moverarriba = true;
         break;
     case Qt::Key_S:
     case Qt::Key_Down:
         // Mover abajo
-        jugador -> Mov_down();
+        m_moverabajo = true;
         break;
     case Qt::Key_A:
     case Qt::Key_Left:
         // Mover izquierda
-        if (!HayIA)jugador -> Mov_izquierda();
+        m_moverizquierda = true;
         break;
     case Qt::Key_D:
     case Qt::Key_Right:
         // Mover derecha
-        if (!HayIA)jugador -> Mov_derecha();
+        m_moverderecha = true;
         break;
     case Qt::Key_E:
     case Qt::Key_N:
@@ -242,11 +242,33 @@ void Nivel_1::keyPressEvent(QKeyEvent *event)
 void Nivel_1::keyReleaseEvent(QKeyEvent *event)
 {
     // Manejar liberación de teclas
+    switch(event->key()) {
+    case Qt::Key_W:
+    case Qt::Key_Up:
+        // Mover arriba
+        m_moverarriba = false;
+        break;
+    case Qt::Key_S:
+    case Qt::Key_Down:
+        // Mover abajo
+        m_moverabajo = false;
+        break;
+    case Qt::Key_A:
+    case Qt::Key_Left:
+        // Mover izquierda
+        m_moverizquierda = false;
+        break;
+    case Qt::Key_D:
+    case Qt::Key_Right:
+        // Mover derecha
+        m_moverderecha = false;
+        break;
+    }
+
     QWidget::keyReleaseEvent(event);
 }
 
-void Nivel_1::onVolverClicked()
-{
+void Nivel_1::onVolverClicked(){
     timer->stop(); // Detener el juego
 
     // Detener música del nivel y desconectar señal
@@ -262,6 +284,19 @@ void Nivel_1::update()
 {
     foto1->moveBy(-speed, 0);
     foto2->moveBy(-speed, 0);
+
+    if (m_moverabajo){
+        jugador -> Mov_down();
+    }
+    if (m_moverarriba){
+        jugador -> Mov_up();
+    }
+    if (m_moverderecha && !HayIA){
+        jugador -> Mov_derecha();
+    }
+    if (m_moverizquierda && !HayIA){
+        jugador -> Mov_izquierda();
+    }
 
     for (auto it = enemigos.begin(); it != enemigos.end();) {
         Avion* e = *it;
@@ -368,7 +403,7 @@ void Nivel_1::generarIA(){
         qDebug() << IA -> getTotalRondas() << "| " << IA -> getRondaActual();
         QTimer::singleShot(3000, [this](){
             actualizarIA();
-            limit_derribados += 2;
+            limit_derribados += 5;
             HayIA = false;
         });
     }
