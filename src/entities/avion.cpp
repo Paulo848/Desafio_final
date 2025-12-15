@@ -4,12 +4,11 @@ Avion::Avion(bool _bando, qreal posx, qreal posy): FuerzaArmada(35, _bando, (_ba
     direccion = Vector2D(1.0, 0.0);
     if (_bando){
         sprite.load(":/entes/nivel_1/Avio_aliado.png");
-        velocidad = 5;
+        velocidad = 3;
     } else {
         sprite.load(":/entes/nivel_1/Avio_enemigo.png");
-        velocidad = 3;
+        velocidad = 4;
     }
-
     double centerX = 76.0 / 2.0; // 38.0
     double centerY = 24.0 / 2.0; // 12.0
     setTransformOriginPoint(centerX, centerY);
@@ -72,6 +71,10 @@ void Avion::Mov_up(){
     setPos(pos().x(), pos().y() + direcc.y());
 }
 
+bool Avion::AumentarDisparo(){
+    return BalasDisponibles > 0;
+}
+
 void Avion::Mov_down(){
     direccion.set(0.0, 1.0);
     Vector2D direcc = direccion * velocidad;
@@ -103,17 +106,22 @@ bool Avion::esJugador() const{
 }
 
 void Avion::Disparar(bool Modo){
-    if (!Modo){
-        if (jugador){
-            Vector2D direccionbala(1.0, 0.0);
-            municion.push_back(new Misil(this, direccionbala));
+    if (BalasDisponibles != 0){
+        if (!Modo){
+            if (jugador){
+                Vector2D direccionbala(1.0, 0.0);
+                municion.push_back(new Misil(this, direccionbala));
+            } else {
+                Vector2D direccionbala(-1.0, 0.0);
+                municion.push_back(new Misil(this, direccionbala));
+            }
         } else {
-            Vector2D direccionbala(-1.0, 0.0);
-            municion.push_back(new Misil(this, direccionbala));
+            Vector2D direccionbala(1.0, 1.0);
+            municion.push_back(new Misil(this, direccionbala.normalizado()));
         }
-    } else {
-        Vector2D direccionbala(1.0, 1.0);
-        municion.push_back(new Misil(this, direccionbala.normalizado()));
+        BalasDisponibles--;
+    } else if (municion.size() == 0) {
+        BalasDisponibles = 15;
     }
 }
 

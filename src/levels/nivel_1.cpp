@@ -20,7 +20,7 @@ Nivel_1::Nivel_1(int numeroNivel, QWidget *parent)
     // Iniciar bucle juego
     timer = new QTimer(this);
     connect(timer, &QTimer::timeout, this, &Nivel_1::actualizarJuego);
-    timer->start(1500);
+    timer->start(1000);
 }
 
 Nivel_1::~Nivel_1()
@@ -195,11 +195,6 @@ void Nivel_1::manejarColisiones(Avion* ente)
 void Nivel_1::keyPressEvent(QKeyEvent *event)
 {
     // Manejar controles del jugador
-    if (HayIA){
-        jugador -> setVelocidad(3);
-    } else {
-        jugador -> setVelocidad(5);
-    }
     switch(event->key()) {
     case Qt::Key_W:
     case Qt::Key_Up:
@@ -225,14 +220,18 @@ void Nivel_1::keyPressEvent(QKeyEvent *event)
     case Qt::Key_N:
         //Disparo Parabólico
         jugador->Disparar(true);
-        escena -> addItem(jugador -> obtenerDisparo(jugador -> getCantMunicion()));
-        jugador -> setCantmunicion(1);
+        if (jugador -> AumentarDisparo()){
+            escena -> addItem(jugador -> obtenerDisparo(jugador -> getCantMunicion()));
+            jugador -> setCantmunicion(1);
+        }
         break;
     case Qt::Key_Space:
         // Disparar
         jugador->Disparar(false);
-        escena -> addItem(jugador -> obtenerDisparo(jugador -> getCantMunicion()));
-        jugador -> setCantmunicion(1);
+        if (jugador -> AumentarDisparo()){
+            escena -> addItem(jugador -> obtenerDisparo(jugador -> getCantMunicion()));
+            jugador -> setCantmunicion(1);
+        }
         break;
     }
 
@@ -364,8 +363,10 @@ void Nivel_1::DisparosEnemigosAuto(){
                 if (!avion -> getrecargar()){
                     if (std::abs(jugador -> pos().y() - avion -> pos().y()) < limit && std::abs(jugador -> pos().x() - avion -> pos().x()) < 900){
                         avion -> Disparar(false);
-                        escena -> addItem(avion -> obtenerDisparo(avion -> getCantMunicion()));
-                        avion -> setCantmunicion(1);
+                        if (avion -> AumentarDisparo()){
+                            escena -> addItem(avion -> obtenerDisparo(avion -> getCantMunicion()));
+                            avion -> setCantmunicion(1);
+                        }
                     }
                 }
             }
@@ -413,8 +414,7 @@ bool Nivel_1::generarEnemigos(){
     return jugador -> getderribados() < limit_derribados;
 }
 
-void Nivel_1::MostrarResultadosdeJuego()
-{
+void Nivel_1::MostrarResultadosdeJuego(){
     // Detener musica
     if (m_sonidoAmbiente) {
         disconnect(m_sonidoAmbiente, &QSoundEffect::playingChanged,
@@ -554,12 +554,10 @@ void Nivel_1::MostrarResultadosdeJuego()
     );
 
     // ================== BOTONES (CONTENIDO ORIGINAL RESTAURADO, ESTILO VISUAL MODIFICADO) ==================
-    QPushButton* btnReintentar = new QPushButton("Reintentar");
     QPushButton* btnSalir = new QPushButton("Salir al menú"); // Se mantiene el texto original
 
     QHBoxLayout* botones = new QHBoxLayout();
     botones->addStretch(); // Para centrar los botones
-    botones->addWidget(btnReintentar);
     botones->addWidget(btnSalir);
     botones->addStretch();
 
@@ -592,7 +590,6 @@ void Nivel_1::MostrarResultadosdeJuego()
 
 
     // ================== CONEXIONES Y DECISIÓN ==================
-    connect(btnReintentar, &QPushButton::clicked, &dialog, &QDialog::accept);
     connect(btnSalir, &QPushButton::clicked, &dialog, &QDialog::reject);
 
     int result = dialog.exec();
@@ -604,38 +601,9 @@ void Nivel_1::MostrarResultadosdeJuego()
         darkener = nullptr;
     }
 
-    if (result == QDialog::Accepted) {
-        reiniciarNivel();
-    } else {
+    if (result == QDialog::Rejected || result == QDialog::Accepted) {
         emit volverAlMenu();
     }
-}
-
-void Nivel_1::reiniciarNivel(){
-    // Limpiar escena
-    escena->clear();
-
-    // Reset de estado
-    derribados = 0;
-
-    // Volver a crear todo
-    inicializarUI();
-    inicializarEscena();
-    cargarElementosNivel();
-
-    // Reactivar musica
-    if (m_sonidoAmbiente) {
-        connect(m_sonidoAmbiente, &QSoundEffect::playingChanged,
-                this, &Nivel_1::onSonidoAmbienteTerminado);
-        if (!m_sonidoAmbiente->isPlaying()) {
-            m_sonidoAmbiente->play();
-        }
-    }
-
-    // Reactivar timers
-    timer->start();
-    timer1->start();
-    tiempodisparos->start();
 }
 
 void Nivel_1::inicializarHUD(){

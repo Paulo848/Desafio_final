@@ -44,9 +44,12 @@ public:
     void Mov_izquierda();
     void Mov_up();
     void Mov_down();
+    bool AumentarDisparo();
+    bool recibiodaño = false;
     void Mov_Combinado();
 
 private:
+    short int BalasDisponibles = 20;
     bool Dispara = true;
     short int Danhocausado = 0;
     short int DanioInfligido = 0;

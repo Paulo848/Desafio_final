@@ -3,7 +3,7 @@
 #include "avion.h"
 #define GRAVEDAD 4.5f
 
-Misil::Misil(FuerzaArmada* duenho, const Vector2D &dir): Proyectil(duenho, dir, duenho -> getVelocidad(), 20, 200){
+Misil::Misil(FuerzaArmada* duenho, const Vector2D &dir): Proyectil(duenho, dir, duenho -> getVelocidad(), 20, (duenho -> esJugador()) ? 200:5){
     double centerX = 0.0, centerY = 0.0;
     if (duenho -> esJugador()){
         sprite.load(":/proyectiles/nivel_1/cohete_2.png");
@@ -12,6 +12,7 @@ Misil::Misil(FuerzaArmada* duenho, const Vector2D &dir): Proyectil(duenho, dir, 
         sprite.load(":/proyectiles/nivel_1/cohete_1.png");
 
     }
+
     ancho = sprite.width();
     largo = sprite.height();
     centerX = ancho / 2.0;
@@ -100,12 +101,22 @@ void Misil::Colision_Avion(){
         if (avion) {
             if (avion -> esJugador() != esDeJugador()){
                 qDebug() << avion -> esJugador() << "| Colisiono con Bala.";
-                if (!avion -> esJugador()){
+                if (avion -> esJugador()){
+                    avion -> recibirDanio(100);
+                    if (avion -> getVida() < 0){
+                        avion -> setVida(0);
+                        avion -> muerto = true;
+                        break;
+                    }
+                } else {
                     avion -> recibirImpacto(this);
                 }
                 if (this -> esDeJugador()){
                     Avion* jugador = dynamic_cast<Avion*>(getemisor());
-                    jugador -> setDanioInfligido(getDaño());
+                    if (!jugador -> recibiodaño){
+                        jugador -> setDanioInfligido(getDaño());
+                        jugador -> recibiodaño = true;
+                    }
                 } else {
                     Avion* enemigo = dynamic_cast<Avion*>(getemisor());
                     enemigo -> setDanioInfligido(getDaño());
