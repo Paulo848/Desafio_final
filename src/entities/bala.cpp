@@ -3,12 +3,12 @@
 #include "proyectil.h"
 
 Bala::Bala(FuerzaArmada *emisor,
-           const Vector2D &dir)
+           const Vector2D &dir, int d)
     : Proyectil(emisor,
                 dir,       // dirección
                 12.0,      // velocidad
                 3.0,       // radio
-                10)        // daño
+                d)        // daño
 {
     setZValue(-900);
 }

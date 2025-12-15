@@ -11,6 +11,9 @@ private:
     int  municionMaxima = 0;
     bool disparando     = false;
 
+    QPixmap sprite;
+    bool tieneSprite = false;
+
 public:
     Cadete(qreal r = 10.0,
            qreal x = 0.0,
@@ -23,6 +26,8 @@ public:
                QWidget *widget) override;
     void recibirImpacto(Proyectil* p) override;
     bool esJugador() const override;
+
+    QRectF boundingRect() const override;
 
     // ============================
     //  Control de disparo / munición
@@ -47,6 +52,13 @@ public:
 
     // Intenta consumir una bala. Devuelve true si pudo disparar.
     bool consumirBala();
+
+    // Getters usados por el HUD (Nivel)
+    int getBalas() const;
+    int getBalasMax() const;
+
+    void setSprite(const QString& path);
+
 
 };
 
