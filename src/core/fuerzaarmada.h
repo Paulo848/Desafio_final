@@ -11,10 +11,10 @@ class FuerzaArmada : public QGraphicsItem
 protected:
     Vector2D direccion;    // Unitario
 
-    qreal    radio;        // Para hitbox circular
-    int      vida = 10;
-    qreal    velocidad;
-    bool     jugador;
+    qreal radio;        // Para hitbox circular
+    int vida = 10;
+    qreal velocidad;
+    bool jugador;
 
 public:
     bool muerto;
@@ -56,7 +56,6 @@ public:
     //---- Colisiones -----
     virtual void recibirImpacto(Proyectil* p) = 0;
     virtual bool esJugador() const = 0;
-
 };
 
 #endif // FUERZAARMADA_H

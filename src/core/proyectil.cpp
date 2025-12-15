@@ -52,7 +52,6 @@ void Proyectil::avanzar()
     }
   
     // Colisiones:
-
     auto cols = collidingItems();
     for (auto item : cols)
     {
@@ -90,4 +89,8 @@ void Proyectil::paint(QPainter *p,
     p->setBrush(Qt::yellow);
     p->setPen(Qt::NoPen);
     p->drawEllipse(bounds);
+}
+
+FuerzaArmada* Proyectil::getemisor(){
+    return emisor;
 }

@@ -31,6 +31,7 @@ public:
 
     QRectF boundingRect() const override { return bounds; }
     QPainterPath shape() const override;
+    FuerzaArmada* getemisor();
 
     // El cuerpo del movimiento es igual en todos los proyectiles
     virtual void avanzar();
@@ -49,7 +50,6 @@ public:
     inline int getDaño(){
         return daño;
     }
-
 };
 
 #endif

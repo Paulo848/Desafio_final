@@ -32,6 +32,15 @@
         <file>nivel_2/obs_2.png</file>
         <file>nivel_2/obs_1.png</file>
         <file>nivel_2/barco.png</file>
+        <file>nivel_1/roca_1.png</file>
+    </qresource>
+    <qresource prefix="/proyectiles">
+        <file>nivel_1/cohete_1.png</file>
+        <file>nivel_1/cohete_2.png</file>
+    </qresource>
+    <qresource prefix="/entes">
+        <file>nivel_1/Avio_aliado.png</file>
+        <file>nivel_1/Avio_enemigo.png</file>
         <file>nivel_2/torpedo.png</file>
     </qresource>
     <qresource prefix="/cadete">
