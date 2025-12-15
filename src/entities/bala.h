@@ -7,7 +7,7 @@ class Bala : public Proyectil
 {
 public:
     Bala(FuerzaArmada *emisor,
-         const Vector2D &dir);
+         const Vector2D &dir, int d);
 
     void aplicarColision(FuerzaArmada *objetivo) override;
     void aplicarImpacto(FuerzaArmada *obj) override;

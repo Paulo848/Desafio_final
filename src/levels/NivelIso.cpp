@@ -279,12 +279,21 @@ void NivelIso::paintEvent(QPaintEvent *event)
 
             painter.save();
             painter.translate(tScreen);
-            painter.setBrush(Qt::cyan);
-            painter.setPen(Qt::darkCyan);
-            painter.drawEllipse(QRectF(-8, -4, 16, 8));
+
+            // Si tiene sprite, dibujarlo
+            if (t.tieneSprite() && !t.getSprite().isNull()) {
+                const QPixmap &sprite = t.getSprite();
+                int w = sprite.width();
+                int h = sprite.height();
+
+                // Dibujar centrado
+                painter.drawPixmap(-w / 2, -h / 2, sprite);
+            }
+
             painter.restore();
         }
     }
+
 
     /*
     // Dibujar hitboxes de depuración (verde = no colisión, rojo = colisión)
@@ -399,6 +408,13 @@ void NivelIso::dispararTorpedo()
     Torpedo torpedo;
     QPointF posBarco = m_barco.position();
     torpedo.setPosition(QPointF(posBarco.x() + 20, posBarco.y()));
+    m_torpedos.append(torpedo);
+
+    // Cargar sprite del torpedo
+    if (!m_spriteTorpedo.isNull()) {
+        torpedo.setSprite(m_spriteTorpedo);
+    }
+
     m_torpedos.append(torpedo);
 
     // Activar cooldown y gastar munición
@@ -1064,4 +1080,18 @@ void NivelIso::cargarSpritesObstaculos()
                                              Qt::KeepAspectRatio,
                                              Qt::SmoothTransformation);
     }
+    // Sprite torpedo
+    m_spriteTorpedo = QPixmap(":/obs/nivel_2/torpedo.png");
+
+    const qreal scaleFactorTorpedo = 0.07;
+    if (!m_spriteTorpedo.isNull()) {
+        int newW = int(m_spriteTorpedo.width()  * scaleFactorTorpedo);
+        int newH = int(m_spriteTorpedo.height() * scaleFactorTorpedo);
+
+        m_spriteTorpedo = m_spriteTorpedo.scaled(newW, newH,
+                                                 Qt::KeepAspectRatio,
+                                                 Qt::SmoothTransformation);
+    }
 }
+
+

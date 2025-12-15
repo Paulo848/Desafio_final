@@ -51,3 +51,23 @@ const Hitbox &Torpedo::hitbox() const
 {
     return m_hitbox;
 }
+
+void Torpedo::setSprite(const QPixmap &sprite)
+{
+    if (!sprite.isNull()) {
+        m_sprite = sprite;
+        m_tieneSprite = true;
+    } else {
+        m_tieneSprite = false;
+    }
+}
+
+const QPixmap& Torpedo::getSprite() const
+{
+    return m_sprite;
+}
+
+bool Torpedo::tieneSprite() const
+{
+    return m_tieneSprite;
+}

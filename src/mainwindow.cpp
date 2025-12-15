@@ -94,6 +94,11 @@ void MainWindow::cargarNivel3()
     nivelActual = new Nivel(3, this);
     connect(nivelActual, &Nivel::volverAlMenu, this, &MainWindow::mostrarMenuPrincipal);
 
+    connect(nivelActual, &Nivel::reintentarNivel,
+            this, [this](int /*numNivel*/) {
+                this->cargarNivel3();   // destruimos el actual y creamos uno nuevo
+            });
+
     // Agregar nivel al contenedor
     contenedor->addWidget(nivelActual);
 

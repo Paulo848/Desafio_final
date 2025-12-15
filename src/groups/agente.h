@@ -11,9 +11,7 @@ class Nivel;
 // ---- Modos de comportamiento de un grupo ----
 enum class ModoGrupo {
     AtaqueDirecto,
-    Flanqueo,
     Campamento,
-    Emboscada,
     Rotacion
 };
 
@@ -22,6 +20,7 @@ enum class EstadoGrupo {
     Preparando,
     EnPosicion,
     Atacando,
+    Huyendo,
     Muerto
 };
 
