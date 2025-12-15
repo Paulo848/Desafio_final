@@ -422,20 +422,17 @@ void Nivel_1::MostrarResultadosdeJuego(){
         m_sonidoAmbiente->stop();
     }
 
-    QColor colorOscuro(0, 0, 0, 150); // Negro con 150/255 de opacidad (~60% opaco)
+    QColor colorOscuro(0, 0, 0, 150);
 
-    // Obtener los límites visibles de la escena
-    QRectF sceneRect = QRectF(0, -400, 1600, 1500); // Asumiendo que Nivel_1 es la escena o la conoce
+    QRectF sceneRect = QRectF(0, -400, 1600, 1500);
 
-    // Crear y añadir el rectángulo oscuro que cubre la escena
     QGraphicsRectItem* darkener = new QGraphicsRectItem(sceneRect);
     darkener -> setBrush(QBrush(colorOscuro));
-    darkener -> setZValue(999); // Asegura que esté por encima de todos los elementos del nivel
+    darkener -> setZValue(999);
     escena -> addItem(darkener);
-    // ================== EVALUAR OBJETIVOS (SE MANTIENE IGUAL) ==================
     int objetivosCumplidos = 0;
     short int LimiteEnemigos = jugador->getCreados() * 0.3;
-    int LimiteDanio = jugador->getderribados() * 400; // Ajusta según tu juego
+    int LimiteDanio = jugador->getderribados() * 400;
 
     bool sobrevivir = !jugador->muerto;
     bool eliminarEnemigos = jugador->getderribados() >= LimiteEnemigos;
@@ -445,16 +442,14 @@ void Nivel_1::MostrarResultadosdeJuego(){
     if (eliminarEnemigos) objetivosCumplidos++;
     if (generarDanio) objetivosCumplidos++;
 
-    bool gano = (objetivosCumplidos >= 3); // Ajusta según tus reglas
+    bool gano = (objetivosCumplidos >= 3);
 
-    // Se mantiene esta variable aunque no se use en el layout final, por si la necesitas
     int porcentajeEnemigos = 0;
     if (LimiteEnemigos > 0) {
         porcentajeEnemigos = (jugador->getderribados() * 100) / LimiteEnemigos;
         if (porcentajeEnemigos > 100) porcentajeEnemigos = 100;
     }
 
-    // ================== DIALOGO (ESTILO VISUAL MODIFICADO) ==================
     QDialog dialog(this);
     dialog.setWindowTitle("Resultados del nivel");
     dialog.setModal(true);
@@ -487,20 +482,17 @@ void Nivel_1::MostrarResultadosdeJuego(){
     layout->setContentsMargins(20, 20, 20, 20);
     layout->setSpacing(5);
 
-    // ================== TITULO (CONTENIDO ORIGINAL RESTAURADO) ==================
     QLabel* titulo = new QLabel(gano ? "🏆 NIVEL SUPERADO" : "💀 MISIÓN FALLIDA");
     titulo->setAlignment(Qt::AlignCenter);
     QFont f = titulo->font();
-    f.setPointSize(22); // Tamaño grande para el título
+    f.setPointSize(22);
     f.setBold(true);
     titulo->setFont(f);
-    // Mantiene colores originales (gold/red) pero sobre un bloque negro para el contraste
     titulo->setStyleSheet(
         gano ? "color: gold; background-color: #000000; padding: 10px 0; margin: 0;"
              : "color: red; background-color: #000000; padding: 10px 0; margin: 0;"
     );
 
-    // ================== FUNCION LINEA (CONTENIDO ORIGINAL RESTAURADO) ==================
     auto crearLinea = []() {
         QFrame* linea = new QFrame();
         linea->setFrameShape(QFrame::HLine);
@@ -510,14 +502,12 @@ void Nivel_1::MostrarResultadosdeJuego(){
         return linea;
     };
 
-    // ================== RESUMEN (CONTENIDO ORIGINAL RESTAURADO) ==================
     QLabel* lblResumenTitulo = new QLabel("📊 Resumen");
     lblResumenTitulo->setStyleSheet("font-weight:bold; font-size: 14px; color: #CCCCCC; margin-top: 10px;");
 
     QLabel* resumen = new QLabel(QString("Objetivos cumplidos: %1 / 3").arg(objetivosCumplidos));
     resumen->setAlignment(Qt::AlignCenter);
 
-    // ================== MISIONES (CONTENIDO ORIGINAL RESTAURADO) ==================
     QLabel* lblMisionesTitulo = new QLabel("🎯 Misiones");
     lblMisionesTitulo->setStyleSheet("font-weight:bold; font-size: 14px; color: #CCCCCC; margin-top: 10px;");
 
@@ -541,7 +531,6 @@ void Nivel_1::MostrarResultadosdeJuego(){
     cbDanio->setEnabled(false);
     cbDanio->setStyleSheet(generarDanio ? "color: #00C853;" : "color: #FF5252;");
 
-    // ================== PROGRESO DEL NIVEL (CONTENIDO ORIGINAL RESTAURADO) ==================
     QLabel* lblProgresoTitulo = new QLabel("⏱ Progreso del nivel");
     lblProgresoTitulo->setStyleSheet("font-weight: bold; font-size: 14px; color: #CCCCCC; margin-top: 10px;");
 
@@ -553,15 +542,13 @@ void Nivel_1::MostrarResultadosdeJuego(){
         QString("Oleadas superadas: %1 / %2").arg(OleadasSuperadas).arg(TotalOleadas)
     );
 
-    // ================== BOTONES (CONTENIDO ORIGINAL RESTAURADO, ESTILO VISUAL MODIFICADO) ==================
-    QPushButton* btnSalir = new QPushButton("Salir al menú"); // Se mantiene el texto original
+    QPushButton* btnSalir = new QPushButton("Salir al menú");
 
     QHBoxLayout* botones = new QHBoxLayout();
     botones->addStretch(); // Para centrar los botones
     botones->addWidget(btnSalir);
     botones->addStretch();
 
-    // ================== ARMAR LAYOUT (CON TODA LA ESTRUCTURA ORIGINAL) ==================
     layout->addWidget(titulo);
     layout->addSpacing(10);
 
@@ -643,33 +630,25 @@ void Nivel_1::inicializarHUD(){
 
     int x = 900;
 
-    // **2. Crear el Layout Horizontal (QHBoxLayout)**
     QHBoxLayout *layoutHorizontal = new QHBoxLayout(contenedorStats);
     layoutHorizontal->setSpacing(5); // Espacio entre labels
     layoutHorizontal->setContentsMargins(5, 5, 5, 5); // Margen interior del contenedor
 
-    // 3. Estilo para los Labels individuales
     QString estiloLabel =
         "QLabel {"
         "  border: 1px solid #7f8c8d;"                       // Borde gris/plata más sutil
         "  border-radius: 4px;"
-        "  background-color: rgba(236, 240, 241, 150);"      // Gris muy claro semi-transparente
-        "  color: #2c3e50;"                                  // Letra azul oscuro/negro para contraste
+        "  background-color: rgba(236, 240, 241, 150);"
+        "  color: #2c3e50;"
         "  font-weight: bold;"
         "  text-align: center;"
         "}";
-
-    // **4. Estilo para el Contenedor de Fondo (QWidget)**
-    // Usaremos un fondo para que el conjunto de labels resalte.
     QString estiloContenedor =
         "QWidget {"
-        "  background-color: rgba(44, 62, 80, 200);"          // Fondo oscuro (azul marino/gris oscuro) semi-transparente
-        "  border: 2px solid #ecf0f1;"                       // Borde blanco/plata
+        "  background-color: rgba(44, 62, 80, 200);"
+        "  border: 2px solid #ecf0f1;"
         "  border-radius: 8px;"
         "}";
-
-    // **5. Inicializar y configurar los Labels**
-    // ... (Inicialización de lblRonda, lblOleadas, lblEnemigos, lblDanio)
 
     // Ronda
     lblRonda = new QLabel(QString("Ronda: %1 / %2").arg(IA -> getRondaActual()).arg(IA -> getTotalRondas()));
@@ -699,7 +678,6 @@ void Nivel_1::inicializarHUD(){
     lblDanio->setStyleSheet(estiloLabel);
     layoutHorizontal->addWidget(lblDanio);
 
-    // **6. Aplicar estilos y posicionar el Contenedor**
     contenedorStats->setStyleSheet(estiloContenedor);
 
     // Obtener el ancho y alto que el layout necesita
@@ -709,7 +687,6 @@ void Nivel_1::inicializarHUD(){
     // Posicionar el contenedor completo con X = 850
     contenedorStats->setGeometry(x, y, containerWidth, containerHeight);
 
-    // **7. Asegurar que esté por encima de todo**
     contenedorStats->raise();
     contenedorStats->show();
 }
@@ -745,7 +722,6 @@ void Nivel_1::actualizarHUD() {
                                  "}"
                                  ).arg(color));
 
-    // 2. -------- Actualizar Estadísticas de Texto (Labels) --------
 
     // Ronda
     lblRonda->setText(QString("Ronda: %1 / %2").arg(IA -> getRondaActual()).arg(IA -> getTotalRondas()));
