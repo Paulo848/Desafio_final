@@ -1,0 +1,241 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1100</width>
+    <height>700</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Dia D</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <property name="styleSheet">
+    <string notr="true">QWidget#centralwidget {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                stop:0 #2c3e50,
+                                stop:1 #34495e);
+}</string>
+   </property>
+   <widget class="QLabel" name="lblTitulo">
+    <property name="geometry">
+     <rect>
+      <x>0</x>
+      <y>80</y>
+      <width>1100</width>
+      <height>100</height>
+     </rect>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">QLabel {
+    color: #ecf0f1;
+    font-size: 72px;
+    font-weight: bold;
+    font-family: Impact, Arial Black, sans-serif;
+    letter-spacing: 12px;
+}</string>
+    </property>
+    <property name="text">
+     <string>DIA D</string>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignCenter</set>
+    </property>
+   </widget>
+   <widget class="QLabel" name="lblSubtitulo">
+    <property name="geometry">
+     <rect>
+      <x>0</x>
+      <y>190</y>
+      <width>1100</width>
+      <height>40</height>
+     </rect>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">QLabel {
+    color: #bdc3c7;
+    font-size: 20px;
+    font-style: italic;
+    font-family: Arial, sans-serif;
+}</string>
+    </property>
+    <property name="text">
+     <string>Selecciona tu misión</string>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignCenter</set>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="btnNivel1">
+    <property name="geometry">
+     <rect>
+      <x>150</x>
+      <y>280</y>
+      <width>800</width>
+      <height>80</height>
+     </rect>
+    </property>
+    <property name="minimumSize">
+     <size>
+      <width>200</width>
+      <height>50</height>
+     </size>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">QPushButton {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                                stop:0 #e74c3c,
+                                stop:1 #c0392b);
+    color: white;
+    border: 3px solid rgba(0, 0, 0, 0.3);
+    border-radius: 15px;
+    font-size: 24px;
+    font-weight: bold;
+    font-family: Arial, sans-serif;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+}
+QPushButton:hover {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                                stop:0 #ff6b6b,
+                                stop:1 #e74c3c);
+    border: 4px solid rgba(255, 255, 255, 0.5);
+}
+QPushButton:pressed {
+    padding-top: 4px;
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                                stop:0 #c0392b,
+                                stop:1 #a93226);
+}</string>
+    </property>
+    <property name="text">
+     <string> NIVEL 1 - LLegada en avion</string>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="btnNivel2">
+    <property name="geometry">
+     <rect>
+      <x>150</x>
+      <y>380</y>
+      <width>800</width>
+      <height>80</height>
+     </rect>
+    </property>
+    <property name="minimumSize">
+     <size>
+      <width>200</width>
+      <height>50</height>
+     </size>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">QPushButton {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                                stop:0 #f39c12,
+                                stop:1 #e67e22);
+    color: white;
+    border: 3px solid rgba(0, 0, 0, 0.3);
+    border-radius: 15px;
+    font-size: 24px;
+    font-weight: bold;
+    font-family: Arial, sans-serif;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+}
+QPushButton:hover {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                                stop:0 #ffb84d,
+                                stop:1 #f39c12);
+    border: 4px solid rgba(255, 255, 255, 0.5);
+}
+QPushButton:pressed {
+    padding-top: 4px;
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                                stop:0 #e67e22,
+                                stop:1 #d35400);
+}</string>
+    </property>
+    <property name="text">
+     <string> NIVEL 2 - Desembarco de normandia</string>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="btnNivel3">
+    <property name="geometry">
+     <rect>
+      <x>150</x>
+      <y>480</y>
+      <width>800</width>
+      <height>80</height>
+     </rect>
+    </property>
+    <property name="minimumSize">
+     <size>
+      <width>200</width>
+      <height>50</height>
+     </size>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">QPushButton {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                                stop:0 #27ae60,
+                                stop:1 #229954);
+    color: white;
+    border: 3px solid rgba(0, 0, 0, 0.3);
+    border-radius: 15px;
+    font-size: 24px;
+    font-weight: bold;
+    font-family: Arial, sans-serif;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+}
+QPushButton:hover {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                                stop:0 #52be80,
+                                stop:1 #27ae60);
+    border: 4px solid rgba(255, 255, 255, 0.5);
+}
+QPushButton:pressed {
+    padding-top: 4px;
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                                stop:0 #229954,
+                                stop:1 #1e8449);
+}</string>
+    </property>
+    <property name="text">
+     <string> NIVEL 3 - Resistencia</string>
+    </property>
+   </widget>
+  </widget>
+  <widget class="QMenuBar" name="menubar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>1100</width>
+     <height>21</height>
+    </rect>
+   </property>
+   <property name="styleSheet">
+    <string notr="true">QMenuBar {
+    background-color: #1a252f;
+    color: #ecf0f1;
+    font-weight: bold;
+}
+QMenuBar::item:selected {
+    background-color: #34495e;
+}</string>
+   </property>
+  </widget>
+  <widget class="QStatusBar" name="statusbar">
+   <property name="styleSheet">
+    <string notr="true">QStatusBar {
+    background-color: #1a252f;
+    color: #bdc3c7;
+    font-size: 12px;
+}</string>
+   </property>
+  </widget>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

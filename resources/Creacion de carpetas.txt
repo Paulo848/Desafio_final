@@ -1,1 +1,11 @@
-creacion de carpetas
+<!DOCTYPE RCC>
+<RCC version="1.0">
+    <qresource>
+        <!-- Imágenes existentes -->
+        <file>ui/Fondo_Nivel_3.png</file>
+
+        <!-- ✅ SONIDOS - Rutas relativas al .qrc -->
+        <file>assets/audio/sonido_de_disparo.wav</file>
+        <file>assets/audio/sonido_de_explosion.wav</file>
+    </qresource>
+</RCC>
